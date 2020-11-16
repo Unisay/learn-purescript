@@ -1,7 +1,7 @@
 module Example where
 
 import Prelude
-import Data.Tuple (Tuple(Tuple))
+import Data.Tuple
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 
@@ -90,7 +90,17 @@ shouldBuy' game price = case game, price of
   PC, Cheap -> true
   PC, Expensive -> true
 
--- swap' :: forall a b. Tuple a b -> Tuple b a
--- swap' = ?homework1
--- flip' :: forall a b c. (a -> b -> c) -> (b -> a -> c)
--- flip' = ?homework2
+swap' :: forall a b c. (Tuple a b -> c) -> Tuple b a -> c
+swap' f (Tuple b a) = f (Tuple a b)
+
+swap'' :: forall a b c. (Tuple a b -> c) -> Tuple b a -> c
+swap'' = curry >>> flip' >>> uncurry
+
+flip' :: forall a b c. (a -> b -> c) -> b -> a -> c
+flip' f b a = f a b
+
+flip'' :: forall a b c. (a -> b -> c) -> b -> a -> c
+flip'' = uncurry >>> swap' >>> curry
+
+-- curry :: forall a b c. (Tuple a b -> c) -> a -> b -> c
+-- uncurry :: forall a b c. (a -> b -> c) -> Tuple a b -> c

@@ -38,6 +38,9 @@ derive instance genericLoc :: Generic Loc _
 instance eqLoc :: Eq Loc where
   eq = genericEq
 
+instance showLoc :: Show Loc where
+  show = genericShow
+
 type Size
   = { width :: Natural, height :: Natural }
 

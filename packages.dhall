@@ -123,6 +123,12 @@ let upstream =
 
 let overrides = {=}
 
-let additions = {=}
+let additions =
+      { pseudo-random =
+        { dependencies = [ "effect", "console", "prelude", "lcg", "st" ]
+        , repo = "https://github.com/opyapeus/purescript-pseudo-random.git"
+        , version = "v0.2.2"
+        }
+      }
 
 in  upstream ⫽ overrides ⫽ additions

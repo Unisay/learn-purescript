@@ -21,14 +21,14 @@ mapFst :: forall a b c. (a -> c) -> T a b -> T c b
 mapFst f (Tuple x y) = Tuple (f x) y
 
 mapFst' :: forall a b c. (a -> c) -> T a b -> T c b
-mapFst' f (Tuple a b) = swap (mapSnd f (swap (Tuple a b)))
+mapFst' f t = swap (mapSnd f (swap t))
 
 -- | Try to implement in terms of mapFst + something we learned before
 mapSnd :: forall a b c. (b -> c) -> T a b -> T a c
 mapSnd f (Tuple x y) = Tuple x (f y)
 
 mapSnd' :: forall a b c. (b -> c) -> T a b -> T a c
-mapSnd' f (Tuple a b) = swap (mapFst f (swap (Tuple a b)))
+mapSnd' f = swap >>> mapFst f >>> swap
 
 -- | Given two functions, `bimap` applies them to tuple components correspondingly.
 -- Can test it in REPL with: 
@@ -37,12 +37,12 @@ bimap :: forall a b c d. (a -> b) -> (c -> d) -> T a c -> T b d
 bimap f g (Tuple a c) = Tuple (f a) (g c)
 
 bimap' :: forall a b c d. (a -> b) -> (c -> d) -> T a c -> T b d
-bimap' f g (Tuple a c) = (mapSnd' g (mapFst' f (Tuple a c)))
+bimap' f g t = mapSnd' g (mapFst' f t)
 
 -- | Given two functions such that both expect argument of the same type,
 -- applies both of them to the same argument and joins reulsts in a tuple.
 fanOut :: forall a b c. (a -> b) -> (a -> c) -> a -> T b c
-fanOut f g a = (mapSnd' g (mapFst' f (Tuple a a)))
+fanOut f g a = bimap f g (Tuple a a)
 
 -- Utilities:
 todo :: forall a. String -> a

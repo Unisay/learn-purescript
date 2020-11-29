@@ -1,10 +1,10 @@
 module Homework where
 
 import Prelude
-import Data.Tuple (Tuple)
-import Partial.Unsafe (unsafeCrashWith)
-import Data.String.CodePoints (codePointFromChar)
 import Data.String as String
+import Data.String.CodePoints (codePointFromChar)
+import Data.Tuple (Tuple)
+import Homework.Todo (todo)
 
 -- Syntactic shugar
 type T
@@ -34,10 +34,6 @@ bimap _ _ = todo "bimap"
 -- applies both of them to the same argument and joins reulsts in a tuple.
 fanOut :: forall a b c. (a -> b) -> (a -> c) -> a -> T b c
 fanOut _ _ = todo "fanIn"
-
--- Utilities:
-todo :: forall a. String -> a
-todo message = unsafeCrashWith $ "NOT IMPLEMENTED: " <> message
 
 -- You can use this sample functions for testing in REPL:
 gt5 :: Int -> Boolean

@@ -102,3 +102,48 @@ fibonacciNonTailRecursive = todo' "please implement"
 -}
 fibonacciTailRecursive :: Int -> Int
 fibonacciTailRecursive = todo' "please implement"
+
+{-
+
+Дано натуральное число N. 
+Выведите слово YES, если число N является точной степенью двойки, 
+или слово NO в противном случае.
+
+Операцией возведения в степень пользоваться нельзя!
+
+> isPowerOfTwo 0
+"NO"
+
+> isPowerOfTwo 1
+"YES"
+
+> isPowerOfTwo 2
+"YES"
+
+> isPowerOfTwo 3
+"NO"
+
+> isPowerOfTwo 4
+"YES"
+
+> isPowerOfTwo 5
+"NO"
+
+> isPowerOfTwo 6
+"NO"
+
+> isPowerOfTwo 7
+"NO"
+
+> isPowerOfTwo 8
+"YES"
+
+> isPowerOfTwo 512
+"YES"
+
+> isPowerOfTwo 513
+"NO"
+
+-}
+isPowerOfTwo :: Int -> String
+isPowerOfTwo = todo' "please implement. You can import and use Prelude.compare"

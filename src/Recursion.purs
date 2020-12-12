@@ -27,7 +27,7 @@ data List a
 instance showList :: Show a => Show (List a) where
   show = render
 
-render :: forall a. Show a => List a -> String
+render :: ∀ a. Show a => List a -> String
 render a =
   parens
     ( case a of
@@ -40,20 +40,32 @@ render a =
 
 infixr 6 Cons as :
 
-ints :: Int -> List Int
-ints size = go size Empty
+-- | Produce a `List` of size `Int` that seeds with the given value at its head,
+-- | then runs the given function for subsequent elements
+-- | ```purescript
+-- | produce 5 not true = true : false : true : false : true : Empty
+-- | produce 5 (_ * 2) 2 = 32 : 16 : 8 : 4 : 2 : Empty
+-- | ```
+produce :: ∀ a. Int -> (a -> a) -> a -> List a
+produce size f head = go (head : Empty) size
   where
-  go :: Int -> List Int -> List Int
-  go remainder acc = case remainder of
-    0 -> acc
-    n -> go (remainder - 1) (remainder : acc)
+  go acc remains = case remains, acc of
+    1, _ -> acc
+    _, Empty -> acc
+    _, Cons h _ -> go (f h : acc) (remains - 1)
 
-length :: forall a. List a -> Int
+ints :: Int -> List Int
+ints size = produce size (_ - 1) size
+
+bools :: Int -> List Boolean
+bools size = produce size not true
+
+length :: ∀ a. List a -> Int
 length = case _ of
   Empty -> 0
   Cons h t -> 1 + length t
 
-length' :: forall a. List a -> Int
+length' :: ∀ a. List a -> Int
 length' = go 0
   where
   go :: Int -> List a -> Int
@@ -66,7 +78,7 @@ length' = go 0
 -- | headOr 1 Empty = 1
 -- | headOr 9 (1 : 2 : Empty) = 1
 -- | ````
-headOr :: forall a. a -> List a -> a
+headOr :: ∀ a. a -> List a -> a
 headOr a = case _ of
   Empty -> a
   Cons h _ -> h
@@ -77,7 +89,7 @@ headOr a = case _ of
 -- | sum (1.0 : 2.0 : 3.0 : Empty) = 6.0
 -- | ```
 sum ::
-  forall x.
+  ∀ x.
   Semiring x => -- | Semiring gives you `zero`, `one` and can `add` and `mul`
   List x -> -- List of `add`-able things
   x -- result of summing up (via `add`) all the elements in that list.
@@ -88,7 +100,7 @@ sum = todo' "please implement"
 -- | product (2 : 2 : Empty) = 4
 -- | product (1.0 : 2.0 : 3.0 : Empty) = 6.0
 -- | ```
-product :: forall x. Semiring x => List x -> x
+product :: ∀ x. Semiring x => List x -> x
 product = todo' "please implement"
 
 -- | Reverse elements of the list
@@ -97,9 +109,9 @@ product = todo' "please implement"
 -- | ```
 -- | Law: 
 -- | ```purescript
--- | forall xs. xs = reverse (reverse xs) 
+-- | ∀ xs. xs = reverse (reverse xs) 
 -- | ```
-reverse :: forall x. List x -> List x
+reverse :: ∀ x. List x -> List x
 reverse xs = todo "please implement"
 
 -- | Take first `n` elements of the list and return them as a result.
@@ -107,7 +119,7 @@ reverse xs = todo "please implement"
 -- | take 2 (1 : 2 : 3 : Empty) = 1 : 2 : Empty
 -- | take 9 (1 : 2 : 3 : Empty) = 1 : 2 : 3 : Empty
 -- | ```
-take :: forall x. Int -> List x -> List x
+take :: ∀ x. Int -> List x -> List x
 take n xs = todo "please implement"
 
 -- | Take first `n` elements of the list and return remaining elements
@@ -116,7 +128,7 @@ take n xs = todo "please implement"
 -- | drop 2 (1 : 2 : 3 : Empty) = 3 : Empty
 -- | drop 9 (1 : 2 : 3 : Empty) = Empty
 -- | ```
-drop :: forall x. Int -> List x -> List x
+drop :: ∀ x. Int -> List x -> List x
 drop n xs = todo "please implement"
 
 -- | Apply given function to each element of the list
@@ -127,7 +139,7 @@ drop n xs = todo "please implement"
 -- | map (_ * 2) Empty = Empty
 -- | map identity (1 : 3 : 7 : Empty) = (1 : 3 : 7 : Empty)
 -- | ```
-map :: forall a b. (a -> b) -> List a -> List b
+map :: ∀ a b. (a -> b) -> List a -> List b
 map as = todo "please implement"
 
 -- | Filter elements of a list using provided predicate. 
@@ -144,5 +156,5 @@ map as = todo "please implement"
 -- | filter identity (true : false : true : Empty) = true : true : Empty
 -- | filter not (true : false : true : Empty) = false : Empty
 -- | ```
-filter :: forall a. (a -> Boolean) -> List a -> List a
+filter :: ∀ a. (a -> Boolean) -> List a -> List a
 filter xs = todo "please implement"

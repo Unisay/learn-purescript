@@ -1,8 +1,7 @@
 module Recursion where
 
-import Prelude
-import Debug.Trace (spy)
-import Homework.Todo (todo, todo')
+import Prelude hiding (map)
+import Homework.Todo (todo)
 
 foo :: Int -> String
 foo i = case i of
@@ -170,7 +169,17 @@ drop = case _, _ of
 -- | map identity (1 : 3 : 7 : Empty) = (1 : 3 : 7 : Empty)
 -- | ```
 map :: ∀ a b. (a -> b) -> List a -> List b
-map as = todo "please implement"
+map f xs = go Empty identity $ go Empty f xs
+  where
+  go :: ∀ x y. List y -> (x -> y) -> List x -> List y
+  go acc g = case _ of
+    Empty -> acc
+    Cons h t -> go (g h : acc) g t
+
+map' :: ∀ a b. (a -> b) -> List a -> List b
+map' f = case _ of
+  Empty -> Empty
+  Cons h t -> Cons (f h) (map f t)
 
 -- | Filter elements of a list using provided predicate. 
 -- | (Any function of type `a -> Boolean` is called a "predicate")

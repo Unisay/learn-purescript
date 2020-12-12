@@ -1,7 +1,6 @@
 module Recursion where
 
-import Prelude
-import Debug.Trace (spy)
+import Prelude hiding (map)
 import Homework.Todo (todo, todo')
 
 foo :: Int -> String
@@ -76,9 +75,7 @@ length' = go 0
 -- | headOr 9 (1 : 2 : Empty) = 1
 -- | ````
 headOr :: ∀ a. a -> List a -> a
-headOr a = case _ of
-  Empty -> a
-  Cons h _ -> h
+headOr a = todo' "please implement"
 
 -- | Sum all elements of the list
 -- | ```purescript

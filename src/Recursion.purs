@@ -116,7 +116,7 @@ product = go one
 -- | ```purescript
 -- | ∀ xs. xs = reverse (reverse xs) 
 -- | ```
-reverse :: forall x. List x -> List x
+reverse :: ∀ x. List x -> List x
 reverse = go Empty
   where
   go acc = case _ of
@@ -129,21 +129,37 @@ reverse = go Empty
 -- | take 9 (1 : 2 : 3 : Empty) = 1 : 2 : 3 : Empty
 -- | ```
 take :: ∀ x. Int -> List x -> List x
-take num = reverse <<< go Empty num
+take num xx =
+  if num < 0 then
+    Empty
+  else
+    reverse (go Empty num xx)
   where
   go acc n xs = case n, xs of
     0, _ -> acc
     _, Empty -> acc
     _, Cons h t -> go (h : acc) (n - 1) t
 
+take' :: ∀ x. Int -> List x -> List x
+take' n xs =
+  if n <= 0 then
+    Empty
+  else case xs of
+    Empty -> Empty
+    Cons h t -> h : take' (n - 1) t
+
 -- | Take first `n` elements of the list and return remaining elements
 -- | as a result.
 -- | ```purescript
 -- | drop 2 (1 : 2 : 3 : Empty) = 3 : Empty
--- | drop 9 (1 : 2 : 3 : Empty) = Empty
+-- | drop 9 ('a' : 'b' : 'c' : Empty) = Empty
 -- | ```
 drop :: ∀ x. Int -> List x -> List x
-drop n xs = todo "please implement"
+drop = case _, _ of
+  n, xs
+    | n <= 0 -> xs
+  _, Empty -> Empty
+  n, Cons _ t -> drop (n - 1) t
 
 -- | Apply given function to each element of the list
 -- | producing a list of results.

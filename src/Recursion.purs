@@ -90,7 +90,11 @@ sum ::
   Semiring x => -- | Semiring gives you `zero`, `one` and can `add` and `mul`
   List x -> -- List of `add`-able things
   x -- result of summing up (via `add`) all the elements in that list.
-sum = todo' "please implement"
+sum = go zero
+  where
+  go acc = case _ of
+    Empty -> acc
+    Cons h t -> go (add acc h) t
 
 -- | Multiply all elements of the list
 -- | ```purescript
@@ -98,7 +102,11 @@ sum = todo' "please implement"
 -- | product (1.0 : 2.0 : 3.0 : Empty) = 6.0
 -- | ```
 product :: ∀ x. Semiring x => List x -> x
-product = todo' "please implement"
+product = go one
+  where
+  go acc = case _ of
+    Empty -> acc
+    Cons h t -> go (mul acc h) t
 
 -- | Reverse elements of the list
 -- | ```purescript
@@ -108,8 +116,12 @@ product = todo' "please implement"
 -- | ```purescript
 -- | ∀ xs. xs = reverse (reverse xs) 
 -- | ```
-reverse :: ∀ x. List x -> List x
-reverse xs = todo "please implement"
+reverse :: forall x. List x -> List x
+reverse = go Empty
+  where
+  go acc = case _ of
+    Empty -> acc
+    Cons h t -> go (h : acc) t
 
 -- | Take first `n` elements of the list and return them as a result.
 -- | ```purescript
@@ -117,7 +129,12 @@ reverse xs = todo "please implement"
 -- | take 9 (1 : 2 : 3 : Empty) = 1 : 2 : 3 : Empty
 -- | ```
 take :: ∀ x. Int -> List x -> List x
-take n xs = todo "please implement"
+take num = reverse <<< go Empty num
+  where
+  go acc n xs = case n, xs of
+    0, _ -> acc
+    _, Empty -> acc
+    _, Cons h t -> go (h : acc) (n - 1) t
 
 -- | Take first `n` elements of the list and return remaining elements
 -- | as a result.

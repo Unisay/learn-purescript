@@ -61,6 +61,16 @@ length' = go 0
     Empty -> acc
     Cons _ t -> go (acc + 1) t
 
+-- | Returns the head of the list or the given default if list is empty.
+-- | ```purescript
+-- | headOr 1 Empty = 1
+-- | headOr 9 (1 : 2 : Empty) = 1
+-- | ````
+headOr :: forall a. a -> List a -> a
+headOr a = case _ of
+  Empty -> a
+  Cons h _ -> h
+
 -- | Sum all elements of the list
 -- | ```purescript
 -- | sum (1 : 2 : 3 : Empty) = 6

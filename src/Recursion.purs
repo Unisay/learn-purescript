@@ -1,7 +1,7 @@
 module Recursion where
 
 import Prelude hiding (map)
-import Homework.Todo (todo)
+import Homework.Todo (todo')
 
 foo :: Int -> String
 foo i = case i of
@@ -59,7 +59,7 @@ bools size = produce size not true
 length :: ∀ a. List a -> Int
 length = case _ of
   Empty -> 0
-  Cons h t -> 1 + length t
+  Cons _h t -> 1 + length t
 
 length' :: ∀ a. List a -> Int
 length' = go 0
@@ -75,9 +75,7 @@ length' = go 0
 -- | headOr 9 (1 : 2 : Empty) = 1
 -- | ````
 headOr :: ∀ a. a -> List a -> a
-headOr a = case _ of
-  Empty -> a
-  Cons h _ -> h
+headOr _a = todo' "please implement"
 
 -- | Sum all elements of the list
 -- | ```purescript

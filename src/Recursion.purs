@@ -91,6 +91,17 @@ sum = todo' "please implement"
 product :: forall x. Semiring x => List x -> x
 product = todo' "please implement"
 
+-- | Reverse elements of the list
+-- | ```purescript
+-- | reverse (1 : 2 : 3 : Empty) = (3 : 2 : 1 : Empty) 
+-- | ```
+-- | Law: 
+-- | ```purescript
+-- | forall xs. xs = reverse (reverse xs) 
+-- | ```
+reverse :: forall x. List x -> List x
+reverse xs = todo "please implement"
+
 -- | Take first `n` elements of the list and return them as a result.
 -- | ```purescript
 -- | take 2 (1 : 2 : 3 : Empty) = 1 : 2 : Empty
@@ -107,17 +118,6 @@ take n xs = todo "please implement"
 -- | ```
 drop :: forall x. Int -> List x -> List x
 drop n xs = todo "please implement"
-
--- | Reverse elements of the list
--- | ```purescript
--- | reverse (1 : 2 : 3 : Empty) = (3 : 2 : 1 : Empty) 
--- | ```
--- | Law: 
--- | ```purescript
--- | forall xs. xs = reverse (reverse xs) 
--- | ```
-reverse :: forall x. List x -> List x
-reverse xs = todo "please implement"
 
 -- | Apply given function to each element of the list
 -- | producing a list of results.

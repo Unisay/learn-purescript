@@ -25,20 +25,17 @@ data List a
   | Cons a (List a)
 
 instance showList :: Show a => Show (List a) where
-  show = render
-
-render :: ∀ a. Show a => List a -> String
-render a =
-  parens
-    ( case a of
-        Empty -> ""
-        Cons h t -> show h <> " : " <> render t
-    )
-  where
-  parens :: String -> String
-  parens x = "(" <> x <> ")"
+  show = case _ of
+    Empty -> "Empty"
+    Cons h t -> show h <> " : " <> show t
 
 infixr 6 Cons as :
+
+visualize :: ∀ a. Show a => List a -> String
+visualize a = case a of
+  Empty -> "Empty"
+  Cons h Empty -> "Cons " <> show h <> " Empty"
+  Cons h t -> "Cons " <> show h <> " (" <> visualize t <> ")"
 
 -- | Produce a `List` of size `Int` that seeds with the given value at its head,
 -- | then runs the given function for subsequent elements

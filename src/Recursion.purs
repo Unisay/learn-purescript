@@ -196,4 +196,8 @@ map' f = case _ of
 -- | filter not (true : false : true : Empty) = false : Empty
 -- | ```
 filter :: ∀ a. (a -> Boolean) -> List a -> List a
-filter xs = todo "please implement"
+filter f = go identity
+  where
+  go k = case _ of
+    Empty -> k Empty
+    Cons h t -> go (if f h then (k <<< (h : _)) else k) t

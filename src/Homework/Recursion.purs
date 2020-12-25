@@ -1,6 +1,5 @@
 module Homework.Recursion where
 
-import Homework.Todo (todo')
 import Prelude
 import Debug.Trace
 

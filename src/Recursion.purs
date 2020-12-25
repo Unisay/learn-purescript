@@ -1,10 +1,7 @@
 module Recursion where
 
 import Prelude hiding (map)
-import Data.Int (base36)
-import Data.Int.Bits (xor)
-import Homework.Todo (todo, todo')
-import Node.Stream (onFinish)
+import Debug.Trace (spy)
 
 foo :: Int -> String
 foo i = case i of
@@ -46,6 +43,8 @@ visualize a = case a of
 -- | produce 5 (_ * 2) 2 = 32 : 16 : 8 : 4 : 2 : Empty
 -- | ```
 produce :: ∀ a. Int -> (a -> a) -> a -> List a
+produce 0 _ _ = Empty
+
 produce size f head = go (head : Empty) size
   where
   go :: List a -> Int -> List a
@@ -71,7 +70,7 @@ length = go 0
   go :: Int -> List a -> Int
   go acc = case _ of
     Empty -> acc
-    Cons _ t -> go (acc + 1) t
+    Cons _ t -> go (add acc 1) t
 
 -- | Returns the head of the list or the given default if list is empty.
 -- | ```purescript
@@ -180,12 +179,12 @@ drop' = case _, _ of
 -- | map' identity (1 : 3 : 7 : Empty) = (1 : 3 : 7 : Empty)
 -- | ```
 map' :: ∀ a b. (a -> b) -> List a -> List b
-map' f = go Empty
+map' f as = go identity as
   where
-  go :: List b -> List a -> List b
+  go :: (List b -> List b) -> List a -> List b
   go acc = case _ of
-    Empty -> reverse acc
-    Cons h t -> go (f h : acc) t
+    Empty -> acc Empty
+    Cons h t -> go ((f h : _) >>> acc) t
 
 -- | Filter elements of a list using provided predicate. 
 -- | (Any function of type `a -> Boolean` is called a "predicate")
@@ -202,9 +201,18 @@ map' f = go Empty
 -- | filter not (true : false : true : Empty) = false : Empty
 -- | ```
 filter :: ∀ a. (a -> Boolean) -> List a -> List a
-filter f = go Empty
+filter p as = go identity as Empty
   where
-  go :: List a -> List a -> List a
-  go acc = case _ of
-    Empty -> reverse acc
-    Cons h t -> go (if f h then h : acc else acc) t
+  go :: (List a -> List a) -> List a -> (List a -> List a)
+  go facc = case _ of
+    Empty -> facc
+    Cons h t -> go (if p h then (h : _) <<< facc else facc) t
+
+fold :: forall a acc. (a -> acc -> Boolean) -> (a -> acc -> acc) -> acc -> List a -> acc
+fold abort f acc = case _ of
+  Empty -> acc
+  Cons h t ->
+    if abort h acc then
+      acc
+    else
+      fold abort f (f h acc) t

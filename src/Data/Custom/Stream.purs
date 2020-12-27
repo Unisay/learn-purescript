@@ -26,6 +26,9 @@ defer = Lazy
 instance functorLazy :: Functor Lazy where
   map f (Lazy thunk) = Lazy (map f thunk)
 
+instance applyLazy :: Apply Lazy where
+  apply f a = Lazy (\_ -> (force f) (force a))
+
 newtype Stream a
   = Stream (Lazy (Step a))
 
@@ -120,3 +123,14 @@ infinite = unfoldr (\b -> Just $ let b' = b + one in Tuple b' b') zero
 
 repeat :: forall a. a -> Stream a
 repeat a = Stream $ defer \_ -> Next a (repeat a)
+
+zip :: forall a b. Stream a -> Stream b -> Stream (Tuple a b)
+zip = zipWith (\a b -> Tuple a b)
+
+zipWith :: forall a b c. (a -> b -> c) -> Stream a -> Stream b -> Stream c
+zipWith op as bs = Stream (go <$> unwrap as <*> unwrap bs)
+  where
+  go = case _, _ of
+    _, Nil -> Nil
+    Nil, _ -> Nil
+    Next x tx, Next y ty -> Next (op x y) (zipWith op tx ty)

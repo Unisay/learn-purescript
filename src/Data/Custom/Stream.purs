@@ -2,7 +2,6 @@ module Data.Custom.Stream where
 
 import Prelude
 import Data.Foldable (class Foldable, foldMap, foldl, foldr)
-import Data.Lazy (Lazy, defer, force)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
 import Data.String.CodeUnits (fromCharArray)
@@ -14,6 +13,18 @@ import Data.Unfoldable
   , unfoldr
   , unfoldr1
   )
+
+newtype Lazy a
+  = Lazy (Unit -> a)
+
+force :: forall a. Lazy a -> a
+force (Lazy thunk) = thunk unit
+
+defer :: forall a. (Unit -> a) -> Lazy a
+defer = Lazy
+
+instance functorLazy :: Functor Lazy where
+  map f (Lazy thunk) = Lazy (map f thunk)
 
 newtype Stream a
   = Stream (Lazy (Step a))

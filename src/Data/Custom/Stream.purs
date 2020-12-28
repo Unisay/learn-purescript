@@ -13,21 +13,7 @@ import Data.Unfoldable
   , unfoldr
   , unfoldr1
   )
-
-newtype Lazy a
-  = Lazy (Unit -> a)
-
-force :: forall a. Lazy a -> a
-force (Lazy thunk) = thunk unit
-
-defer :: forall a. (Unit -> a) -> Lazy a
-defer = Lazy
-
-instance functorLazy :: Functor Lazy where
-  map f (Lazy thunk) = Lazy (map f thunk)
-
-instance applyLazy :: Apply Lazy where
-  apply f a = Lazy (\_ -> (force f) (force a))
+import Data.Custom.Lazy (Lazy, defer, force)
 
 newtype Stream a
   = Stream (Lazy (Step a))

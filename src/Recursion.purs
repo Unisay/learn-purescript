@@ -1,7 +1,10 @@
 module Recursion where
 
 import Prelude hiding (map)
+import Data.Foldable (class Foldable, foldl, foldr)
+import Debug.Trace (spy)
 import Homework.Todo (todo, todo')
+import Unsafe.Coerce (unsafeCoerce)
 
 foo :: Int -> String
 foo i = case i of
@@ -152,3 +155,15 @@ map as = todo "please implement"
 -- | ```
 filter :: ∀ a. (a -> Boolean) -> List a -> List a
 filter xs = todo "please implement"
+
+instance foldableList :: Foldable List where
+  foldl :: forall a acc. (acc -> a -> acc) -> acc -> List a -> acc
+  foldl f acc = case _ of
+    Empty -> acc
+    Cons h t -> foldl f (f acc h) t
+  foldr :: forall a acc. (a -> acc -> acc) -> acc -> List a -> acc
+  foldr f acc = case _ of
+    Empty -> acc
+    Cons h t -> f h (foldr f acc t)
+  foldMap :: forall a m. Monoid m => (a -> m) -> List a -> m
+  foldMap = unsafeCoerce unit

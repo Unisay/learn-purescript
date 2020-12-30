@@ -1,6 +1,8 @@
 module Recursion where
 
 import Prelude hiding (map)
+import Data.Tuple (Tuple(..), snd)
+import Debug.Trace (spy)
 import Homework.Todo (todo)
 
 foo :: Int -> String
@@ -89,11 +91,7 @@ sum ::
   Semiring x => -- | Semiring gives you `zero`, `one` and can `add` and `mul`
   List x -> -- List of `add`-able things
   x -- result of summing up (via `add`) all the elements in that list.
-sum = go zero
-  where
-  go acc = case _ of
-    Empty -> acc
-    Cons h t -> go (add acc h) t
+sum = fold add zero
 
 -- | Multiply all elements of the list
 -- | ```purescript
@@ -101,11 +99,7 @@ sum = go zero
 -- | product (1.0 : 2.0 : 3.0 : Empty) = 6.0
 -- | ```
 product :: ∀ x. Semiring x => List x -> x
-product = go one
-  where
-  go acc = case _ of
-    Empty -> acc
-    Cons h t -> go (mul acc h) t
+product = fold mul one
 
 -- | Reverse elements of the list
 -- | ```purescript
@@ -116,11 +110,7 @@ product = go one
 -- | ∀ xs. xs = reverse (reverse xs) 
 -- | ```
 reverse :: ∀ x. List x -> List x
-reverse = go Empty
-  where
-  go acc = case _ of
-    Empty -> acc
-    Cons h t -> go (h : acc) t
+reverse = fold (flip Cons) Empty
 
 -- | Take first `n` elements of the list and return them as a result.
 -- | ```purescript
@@ -128,16 +118,39 @@ reverse = go Empty
 -- | take 9 (1 : 2 : 3 : Empty) = 1 : 2 : 3 : Empty
 -- | ```
 take :: ∀ x. Int -> List x -> List x
-take num xx =
-  if num < 0 then
-    Empty
-  else
-    reverse (go Empty num xx)
+take num xx = reverse (go Empty num xx)
   where
   go acc n xs = case n, xs of
     0, _ -> acc
     _, Empty -> acc
     _, Cons h t -> go (h : acc) (n - 1) t
+
+takeViaFold :: ∀ x. Show x => Int -> List x -> List x
+takeViaFold n xs = snd (abortableFold f (Tuple n identity) xs) Empty
+  where
+  f :: Tuple Int (List x -> List x) -> x -> Maybe (Tuple Int (List x -> List x))
+  f acc@(Tuple count transformation) x =
+    if count > 0 then
+      Something $ Tuple (count - 1) (Cons x >>> transformation)
+    else
+      Nothing
+
+fold :: ∀ x acc. (acc -> x -> acc) -> acc -> List x -> acc
+fold f = abortableFold (\acc x -> Something (f acc x))
+
+data Maybe a
+  = Nothing
+  | Something a
+
+abortableFold :: ∀ x acc. (acc -> x -> Maybe acc) -> acc -> List x -> acc
+abortableFold f initialAcc = go initialAcc
+  where
+  go :: acc -> List x -> acc
+  go acc = case _ of
+    Empty -> acc
+    Cons x xs -> case f acc x of
+      Nothing -> acc
+      Something acc' -> go acc' xs
 
 take' :: ∀ x. Int -> List x -> List x
 take' n xs =

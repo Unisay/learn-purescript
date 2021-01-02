@@ -1,5 +1,6 @@
 module Recursion where
 
+import Data.Tuple
 import Prelude hiding (map)
 import Debug.Trace (spy)
 
@@ -131,28 +132,14 @@ reverse = go Empty
     Empty -> acc
     Cons h t -> go (h : acc) t
 
--- | Take first `n` elements of the list and return them as a result.
--- | ```purescript
--- | take 2 (1 : 2 : 3 : Empty) = 1 : 2 : Empty
--- | take 9 (1 : 2 : 3 : Empty) = 1 : 2 : 3 : Empty
--- | ```
-take :: ∀ x. Int -> List x -> List x
-take x = reverse <<< go Empty x
-  where
-  go :: List x -> Int -> List x -> List x
-  go acc = case _, _ of
-    0, _ -> acc
-    _, Empty -> acc
-    n, Cons h t -> go (h : acc) (n - 1) t
-
 -- | Take first `n` elements of the list and return remaining elements
 -- | as a result.
 -- | ```purescript
 -- | drop 2 (1 : 2 : 3 : Empty) = 3 : Empty
 -- | drop 9 (1 : 2 : 3 : Empty) = Empty
 -- | ```
-drop :: ∀ x. Int -> List x -> List x
-drop = go Empty
+drop' :: ∀ x. Int -> List x -> List x
+drop' = go Empty
   where
   go :: List x -> Int -> List x -> List x
   go acc = case _, _ of
@@ -162,13 +149,6 @@ drop = go Empty
         go (h : acc) 0 t
       else
         go acc (n - 1) t
-
-drop' :: ∀ x. Int -> List x -> List x
-drop' = case _, _ of
-  n, xs
-    | n <= 0 -> xs
-  _, Empty -> Empty
-  n, Cons _ t -> drop (n - 1) t
 
 -- | Apply given function to each element of the list
 -- | producing a list of results.
@@ -208,11 +188,56 @@ filter p as = go identity as Empty
     Empty -> facc
     Cons h t -> go (if p h then (h : _) <<< facc else facc) t
 
-fold :: forall a acc. (a -> acc -> Boolean) -> (a -> acc -> acc) -> acc -> List a -> acc
-fold abort f acc = case _ of
+data Maybe a
+  = Nothing
+  | Something a
+
+fold :: forall a acc. (a -> acc -> Maybe acc) -> acc -> List a -> acc
+fold k acc = case _ of
   Empty -> acc
-  Cons h t ->
-    if abort h acc then
-      acc
-    else
-      fold abort f (f h acc) t
+  Cons h t -> case k h acc of
+    Nothing -> acc -- abort
+    Something acc' -> fold k acc' t
+
+-- | Take first `n` elements of the list and return them as a result.
+-- | ```purescript
+-- | take 2 (1 : 2 : 3 : Empty) = 1 : 2 : Empty
+-- | take 9 (1 : 2 : 3 : Empty) = 1 : 2 : 3 : Empty
+-- | ```
+type TransformList x
+  = List x -> List x
+
+type Count
+  = Int
+
+type Acc x
+  = Tuple (TransformList x) Count
+
+drop :: ∀ x. Count -> List x -> List x
+drop n xs = fst (fold f acczero xs) Empty
+  where
+  f :: x -> Acc x -> Maybe (Acc x)
+  f currentHead = case _ of
+    Tuple _ count
+      | count > 0 -> Something $ Tuple identity (count - 1)
+    Tuple previousTransforms count -> Something $ Tuple ((currentHead : _) >>> previousTransforms) count
+
+  acczero :: Acc x
+  acczero = Tuple identity n
+
+take :: ∀ x. Count -> List x -> List x
+take n xs = fst (fold k acczero xs) Empty
+  where
+  k :: x -> Acc x -> Maybe (Acc x)
+  k currentHead = case _ of
+    Tuple _ count
+      | count < 1 -> Nothing
+    Tuple previousTransforms count ->
+      Something
+        $ Tuple ((currentHead : _) <<< previousTransforms) (count - 1)
+
+  acczero :: Acc x
+  acczero = Tuple identity n
+
+-- foldl :: forall a. (acc -> a -> acc) -> acc -> List a -> acc
+-- foldr :: forall a. (a -> acc -> acc) -> acc -> List a -> acc

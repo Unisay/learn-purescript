@@ -1,8 +1,8 @@
 module Data.MyMaybe where
 
 import Prelude
+import Data.Foldable (class Foldable, null)
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Helper (notImplemented)
 
@@ -18,10 +18,19 @@ instance showMyMaybe :: Show a => Show (MyMaybe a) where
 instance eqMyMaybe :: Eq a => Eq (MyMaybe a) where
   eq = notImplemented
 
-isNone :: forall a. MyMaybe a -> Boolean
-isNone (Some _) = true
-
-isNone None = false
-
 isSome :: forall a. MyMaybe a -> Boolean
-isSome = not <<< isNone
+isSome = not <<< null
+
+instance foldableMyMaybe :: Foldable MyMaybe where
+  foldr :: forall a b. (a -> b -> b) -> b -> MyMaybe a -> b
+  foldr f accZero = case _ of
+    None -> accZero
+    Some a -> f a accZero
+  foldl :: forall a b. (b -> a -> b) -> b -> MyMaybe a -> b
+  foldl f accZero = case _ of
+    None -> accZero
+    Some a -> f accZero a
+  foldMap :: forall a m. Monoid m => (a -> m) -> MyMaybe a -> m
+  foldMap f = case _ of
+    None -> mempty
+    Some a -> f a

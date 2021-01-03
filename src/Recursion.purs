@@ -3,6 +3,9 @@ module Recursion where
 import Prelude hiding (map)
 import Data.Foldable (class Foldable, foldl, foldr)
 import Homework.Todo (todo')
+import Data.Maybe (Maybe(..))
+import Data.Tuple (Tuple(..))
+import Data.Unfoldable (class Unfoldable, class Unfoldable1, unfoldr, unfoldr1)
 import Unsafe.Coerce (unsafeCoerce)
 
 foo :: Int -> String
@@ -38,25 +41,33 @@ visualize a = case a of
   Cons h Empty -> "Cons " <> show h <> " Empty"
   Cons h t -> "Cons " <> show h <> " (" <> visualize t <> ")"
 
--- | Produce a `List` of size `Int` that seeds with the given value at its head,
--- | then runs the given function for subsequent elements
--- | ```purescript
--- | produce 5 not true = true : false : true : false : true : Empty
--- | produce 5 (_ * 2) 2 = 32 : 16 : 8 : 4 : 2 : Empty
--- | ```
-produce :: ∀ a. Int -> (a -> a) -> a -> List a
-produce size f head = go (head : Empty) size
-  where
-  go acc remains = case remains, acc of
-    1, _ -> acc
-    _, Empty -> acc
-    _, Cons h _ -> go (f h : acc) (remains - 1)
-
 ints :: Int -> List Int
-ints size = produce size (_ - 1) size
+ints size = unfoldr f 1
+  where
+  f :: Int -> Maybe (Tuple Int Int)
+  f seed =
+    if seed > size then
+      Nothing
+    else
+      Just $ Tuple seed (seed + 1)
 
+-- bools 0 == Empty
+-- bools 1 == true : Empty
+-- bools 2 == false : true : Empty
+-- bools 3 == true : false : true : Empty
+-- bools 4 == false : true : false : true : Empty
 bools :: Int -> List Boolean
-bools size = produce size not true
+bools size = unfoldr f (Tuple false size)
+  where
+  f :: Tuple Boolean Int -> Maybe (Tuple Boolean (Tuple Boolean Int))
+  f (Tuple prevBool remainedCount) =
+    if remainedCount < 1 then
+      Nothing
+    else
+      let
+        nextBool = not prevBool
+      in
+        Just $ Tuple nextBool (Tuple nextBool (remainedCount - 1))
 
 length :: ∀ a. List a -> Int
 length = case _ of
@@ -213,3 +224,15 @@ instance foldableList :: Foldable List where
     Cons h t -> f h (foldr f acc t)
   foldMap :: forall a m. Monoid m => (a -> m) -> List a -> m
   foldMap = unsafeCoerce unit
+
+instance unfoldable1List :: Unfoldable1 List where
+  unfoldr1 :: forall a b. (b -> Tuple a (Maybe b)) -> b -> List a
+  unfoldr1 k seed = case k seed of
+    Tuple a Nothing -> Cons a Empty
+    Tuple a (Just newSeed) -> Cons a (unfoldr1 k newSeed)
+
+instance unfoldableList :: Unfoldable List where
+  unfoldr :: forall a b. (b -> Maybe (Tuple a b)) -> b -> List a
+  unfoldr k seed = case k seed of
+    Nothing -> Empty
+    Just (Tuple a newSeed) -> Cons a (unfoldr k newSeed)

@@ -2,20 +2,25 @@ module Data.Custom.Lazy where
 
 import Prelude
 
-newtype Lazy a
-  = Lazy (Unit -> a)
+-- | The `Lazy` class represents types which allow evaluation of values
+-- | to be _deferred_.
+-- |
+-- | Usually, this means that a type contains a function arrow which can
+-- | be used to delay evaluation.
+class Lazy l where
+  defer :: (Unit -> l) -> l
 
-force :: forall a. Lazy a -> a
-force (Lazy thunk) = thunk unit
+instance lazyFn :: Lazy (a -> b) where
+  defer :: (Unit -> a -> b) -> a -> b
+  defer f = \x -> f unit x
 
-defer :: forall a. (Unit -> a) -> Lazy a
-defer = Lazy
+instance lazyUnit :: Lazy Unit where
+  defer _ = unit
 
-instance showLazy :: Show a => Show (Lazy a) where
-  show _ = "<Unevaluated>"
-
-instance functorLazy :: Functor Lazy where
-  map f (Lazy thunk) = Lazy (map f thunk)
-
-instance applyLazy :: Apply Lazy where
-  apply f a = Lazy (\_ -> (force f) (force a))
+-- | `fix` defines a value as the fixed point of a function.
+-- |
+-- | The `Lazy` instance allows us to generate the result lazily.
+fix :: ∀ l. Lazy l => (l -> l) -> l
+fix f = go
+  where
+  go = defer \_ -> f go

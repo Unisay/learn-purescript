@@ -9,6 +9,22 @@ newtype MyIdentity a
 
 derive instance genericMyIdentity :: Generic (MyIdentity a) _
 
+derive newtype instance semiringMyIdentity ::
+  Semiring a =>
+  Semiring (MyIdentity a)
+
+derive newtype instance ringMyIdentity ::
+  Ring a =>
+  Ring (MyIdentity a)
+
+derive newtype instance semigroupMyIdentity ::
+  Semigroup a =>
+  Semigroup (MyIdentity a)
+
+derive newtype instance monoidMyIdentity ::
+  Monoid a =>
+  Monoid (MyIdentity a)
+
 instance foldableMyMaybe :: Foldable MyIdentity where
   foldr :: forall a b. (a -> b -> b) -> b -> MyIdentity a -> b
   foldr f b (MyIdentity a) = f a b

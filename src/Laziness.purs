@@ -1,7 +1,8 @@
 module Laziness where
 
 import Prelude
-import Data.Custom.Thunk (Thunk, th)
+import Data.Custom.Thunk (Thunk, force, th)
+import Data.Maybe (Maybe(..))
 import Effect.Console (log)
 import Effect.Unsafe (unsafePerformEffect)
 import Homework.Todo (todo)
@@ -100,3 +101,15 @@ heavyExpr = th \_ -> go 0
         _ = unsafePerformEffect (log $ "Heavy calculation -> 1000")
       in
         i
+
+-- | Uses value if its available or defalut value (provided lazily, by-need)
+-- |
+-- | ```purescript
+-- | > Nothing `alt` th \_ -> 42
+-- | 42
+-- | 
+-- | > Just 100 `alt` th \_ -> 42
+-- | 100
+-- | ```
+alt :: forall a. Maybe a -> Thunk a -> a
+alt ma d = todo "Homework"

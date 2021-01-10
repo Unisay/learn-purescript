@@ -1,12 +1,18 @@
 module Effects.Runtime where
 
 import Prelude
-import Effect.Console (clear, log)
-import Effect.Unsafe (unsafePerformEffect)
 
--- "Foreign" functions
 clearScreen :: Unit
-clearScreen = unsafePerformEffect clear
+clearScreen = _clearScreen
+
+foreign import _clearScreen :: Unit
 
 printLine :: String -> Unit
-printLine = unsafePerformEffect <<< log
+printLine = _printLine
+
+foreign import _printLine :: String -> Unit
+
+askForInput :: String -> String
+askForInput = _askForInput
+
+foreign import _askForInput :: String -> String

@@ -34,12 +34,17 @@ import Effects.Runtime as Runtime
 -}
 data Eff
   = PrintLine String
+  | AskForInput String (String -> Eff)
   | ClearScreen
   | Compose Eff Eff
 
 runEff :: Eff -> Unit
 runEff = case _ of
   PrintLine s -> Runtime.printLine s
+  AskForInput question continueWith ->
+    runEff
+      $ continueWith
+      $ Runtime.askForInput question
   ClearScreen -> Runtime.clearScreen
   Compose effect1 effect2 ->
     let
@@ -50,20 +55,26 @@ runEff = case _ of
       unit
 
 effectHello :: Eff
-effectHello = PrintLine "Hello"
+effectHello = PrintLine "Hello, my name is Robo."
+
+effectAskName :: (String -> Eff) -> Eff
+effectAskName continueWith = AskForInput "What is your name? " continueWith
 
 effectClear :: Eff
 effectClear = ClearScreen
 
-effectClearHello :: Eff
-effectClearHello = composeEffsSequentially effectClear effectHello
-
-composeEffsSequentially :: Eff -> Eff -> Eff
-composeEffsSequentially = Compose
+program :: Eff
+program =
+  Compose effectClear
+    ( Compose effectHello
+        ( effectAskName \name ->
+            PrintLine ("Your name is: " <> name)
+        )
+    )
 
 -- | Program entry point, should be run with 
 -- | ```shell
 -- | spago run -m Effects
 -- | ```
 main :: Effect Unit
-main = pure $ runEff effectClearHello
+main = pure $ runEff program

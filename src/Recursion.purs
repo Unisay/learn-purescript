@@ -51,12 +51,6 @@ ints size = unfoldr f 1
     else
       Just $ Tuple seed (seed + 1)
 
-infts :: List Int
-infts = unfoldr f 1
-  where
-  f :: Int -> Maybe (Tuple Int Int)
-  f seed = Just $ Tuple seed (seed + 1)
-
 -- bools 0 == Empty
 -- bools 1 == true : Empty
 -- bools 2 == false : true : Empty

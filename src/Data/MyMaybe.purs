@@ -1,6 +1,7 @@
 module Data.MyMaybe where
 
 import Prelude
+import Class.MyFunctor (class MyFunctor)
 import Data.Foldable (class Foldable, null)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
@@ -17,6 +18,11 @@ instance showMyMaybe :: Show a => Show (MyMaybe a) where
 
 instance eqMyMaybe :: Eq a => Eq (MyMaybe a) where
   eq = notImplemented
+
+instance myFunctorMaybe :: MyFunctor MyMaybe where
+  fmap f = case _ of
+    None -> None
+    Some a -> Some $ f a
 
 isSome :: forall a. MyMaybe a -> Boolean
 isSome = not <<< null

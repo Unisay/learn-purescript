@@ -1,6 +1,7 @@
 module Data.MyEither where
 
 import Prelude
+import Class.MyFunctor (class MyFunctor)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.MyMaybe (MyMaybe(Some, None), isSome)
@@ -14,6 +15,12 @@ derive instance genericMyEither :: Generic (MyEither a b) _
 
 instance showMyEither :: (Show a, Show b) => Show (MyEither a b) where
   show = genericShow
+
+instance myFunctorMyEither :: MyFunctor (MyEither left) where
+  fmap :: forall a b. (a -> b) -> (MyEither left) a -> MyEither left b
+  fmap f = case _ of
+    This l -> This l
+    That r -> That (f r)
 
 instance eqMyEither :: Eq (MyEither a b) where
   eq :: MyEither a b -> MyEither a b -> Boolean

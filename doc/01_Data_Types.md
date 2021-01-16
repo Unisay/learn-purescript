@@ -195,7 +195,204 @@ center :: Point
 center = MakePoint 0 0
 ```
 
+В памяти компьютера выражения имеющие тип `Point` хрянятся как данные всех 
+обьединённых типов (`Int` и `Int`) вместе:
+
+<table>
+  <thead>
+    <th colspan="2">Point</th>
+  </thead>
+  <tbody>
+  <tr>
+    <td>
+      <table>
+        <thead><th>Int</th></thead>
+        <tbody><tr><td>11</td></tr></tbody> 
+      </table>
+    </td>
+    <td>
+      <table>
+        <thead><th>Int</th></thead>
+        <tbody><tr><td>42</td></tr></tbody> 
+      </table>
+    </td>
+  </tr>
+  </tbody>
+</table>
+
+Стоит отметить, что способом "__И__" обьединять можно более одного типа.
+
+Например, в программе:
+
+```purescript
+data Person = Int String String Number Point
+
+rating :: Number
+rating = 98.02
+
+location :: Point
+location = MakePoint 110 32
+
+ivanIvanov :: Person
+ivanIvanov = Person 1 "Ivan" "Ivanov" rating location
+```
+
+выражение `ivanIvanov` эквивалентно выражению
+
+```purescript
+Person 1 "Ivan" "Ivanov" 98.02 (MakePoint 110 32)
+```
+
+и в памяти компьютера представлено следующим образом:
+
+<table>
+  <thead><th colspan="5">Person</th></thead>
+  <tbody>
+  <tr>
+    <td>
+      <table>
+        <thead><th>Int</th></thead>
+        <tbody><tr><td>100</td></tr></tbody> 
+      </table>
+    </td>
+    <td>
+      <table>
+        <thead><th>String</th></thead>
+        <tbody><tr><td>"Ivan"</td></tr></tbody> 
+      </table>
+    </td> 
+    <td>
+      <table>
+        <thead><th>String</th></thead>
+        <tbody><tr><td>"Ivanov"</td></tr></tbody> 
+      </table>
+    </td> 
+    <td>
+      <table>
+        <thead><th>Number</th></thead>
+        <tbody><tr><td>98.02</td></tr></tbody> 
+      </table>
+    </td> 
+    <td>
+      <table>
+        <thead><th colspan="2">Point</th></thead>
+        <tbody>
+        <tr>
+          <td>
+            <table>
+              <thead><th>Int</th></thead>
+              <tbody><tr><td>110</td></tr></tbody> 
+            </table>
+          </td>
+          <td>
+            <table>
+              <thead><th>Int</th></thead>
+              <tbody><tr><td>32</td></tr></tbody> 
+            </table>
+          </td>
+        </tr>
+        </tbody>
+      </table>        
+    </td> 
+  </tr>
+  </tbody>
+</table>
+
 ### Обьединение данных способом "__ИЛИ__"
+
+Позволяет объединить в один тип данные других типов взаимоисключающим образом.
+
+Рассмотрим на примере.
+
+Допустим, у нас есть такая палитра цветов:
+
+| Индекс     | Название            | Односимвольное обозначение | Цвет    |
+|------------|---------------------|----------------------------|---------|
+| `1 :: Int` | `"white" :: String` |        `'w' :: Char`       | Белый   |
+| `2 :: Int` | `"red" :: String`   |        `'r' :: Char`       | Красный |
+| `3 :: Int` | `"green" :: String` |        `'g' :: Char`       | Зелёный |
+| `4 :: Int` | `"blue" :: String`  |        `'b' :: Char`       | Синий   |
+
+Любой цвет из этой таблицы можно обозначить 
+в программе одним из трёх способов на выбор:
+
+- С помощью уникального индекса.  
+  Например данные `3` обозначают только зелёный цвет.  
+- С помощью уникального названия.  
+  Например строка `"blue"` обозначает синий цвет.  
+- С помощью уникального символа.  
+  Например символ `'w'` означает белый цвет.
+
+Объявим соответствующий тип `Color`, который может хранить данные обозначающие цвет
+одним из доступных способов:
+
+```purescript
+data Color = ColorByIndex Int | ColorByName String | ColorByChar Char
+```
+
+`Color` - название нового данных.
+
+`Int`, `String`, `Char` - названия объединяемых типов данных.
+
+`|` - символ, обозначающий обьединение способом "__ИЛИ__"
+
+`ColorByIndex` - название функции, 
+конструирующей данные типа `Color` из данных типа `Int`:
+  ```purescript
+  emeraldGreen :: Color
+  emeraldGreen = ColorByIndex 3
+  ```
+
+`ColorByName` - название функции, 
+конструирующей данные типа `Color` из данных типа `String`:
+  ```purescript
+  deepBlue :: Color
+  deepBlue = ColorByName "blue"
+  ```
+
+`ColorByChar` - название функции, 
+конструирующей данные типа `Color` из данных типа `Char`:
+  ```purescript
+  snowWhite :: Color
+  snowWhite = ColorByChar 'w'
+  ```
+
+Такие выражения представлены в памяти так:
+
+
+<table>
+  <thead><th colspan="2">Color</th></thead>
+  <tbody>
+  <tr>
+    <td>ColorByIndex</td>
+    <td>3</td>
+  </tr>
+  </tbody>
+</table>  
+
+или
+
+<table>
+  <thead><th colspan="2">Color</th></thead>
+  <tbody>
+  <tr>
+    <td>ColorByName</td>
+    <td>"blue"</td>
+  </tr>
+  </tbody>
+</table>  
+
+или
+
+<table>
+  <thead><th colspan="2">Color</th></thead>
+  <tbody>
+  <tr>
+    <td>ColorByChar</td>
+    <td>'w'</td>
+  </tr>
+  </tbody>
+</table>  
 
 
 

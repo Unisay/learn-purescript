@@ -1,13 +1,13 @@
 # Функторы (Functors)
 
-К классу `Functor` относятся любые типы данных второго подрядка (kind `Type -> Type`) 
+К классу `Functor` относятся любые типы данных второго подрядка (ещё называемые "Конструкторами типов"), kind `Type -> Type`.
 
 ```purescript
 forall f a. f a
 ```
 (примеры: `List`, `Maybe`, `Either String`, `data MyPhantomType a = Empty`, `(->) a`)
 
-для которых можно определить функцию такого типа:
+для которых можно определить функцию `map` такого типа:
 
 ```purescript
 class Functor f where
@@ -20,11 +20,11 @@ class Functor f where
 
 1. Закон идентичности (Identity)
   ```purescript
-
-  identity :: forall a. a -> a
-  identity a = a
-
   map identity = identity
+  
+  where
+    identity :: forall a. a -> a
+    identity a = a 
   ```
 
 2. Закон композиции (Composition)

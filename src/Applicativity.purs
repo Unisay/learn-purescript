@@ -53,6 +53,52 @@ instance casApply :: (Apply f, Apply g) => Apply (CAS f g) where
   apply :: forall a b. CAS f g (a -> b) -> CAS f g a -> CAS f g b
   apply _ _ = todo "Homework: implement"
 
-instance casApplicative :: (Applicative f, Applicative g) => Applicative (CAS f g) where
+instance casApplicative ::
+  (Applicative f, Applicative g) =>
+  Applicative (CAS f g) where
   pure :: forall a. a -> CAS f g a
   pure _ = todo "Homework: implement"
+
+-- | All instances of the `Applicative` type-class must satisfy four laws.
+-- These laws are not checked by the compiler. These laws are given as:
+-- | The law of identity
+-- | `∀x. pure identity <*> x = x`
+identityLaw :: forall f x. Eq (f x) => Applicative f => f x -> Boolean
+identityLaw x = (pure identity <*> x) == x
+
+-- | The law of composition
+-- | `∀u v w. pure (<<<) <*> u <*> v <*> w = u <*> (v <*> w)`
+compositionLaw ::
+  forall f a b c.
+  Eq (f c) =>
+  Applicative f =>
+  f (b -> c) -> f (a -> b) -> f a -> Boolean
+compositionLaw u v w = l == r
+  where
+  l :: f c
+  l = pure (<<<) <*> u <*> v <*> w
+
+  r :: f c
+  r = u <*> (v <*> w)
+
+-- | The law of homomorphism
+-- | `∀f x. pure f <*> pure x = pure (f x)`
+homomorphismLaw ::
+  forall f a b. Eq (f b) => Applicative f => (a -> b) -> a -> Boolean
+homomorphismLaw f a = l == r
+  where
+  l :: f b
+  l = pure f <*> pure a
+
+  r :: f b
+  r = pure (f a)
+
+-- | The law of interchange
+-- | `∀u y. u <*> pure y = pure ($ y) <*> u`
+interchangeLaw ::
+  forall f a b. Eq (f b) => Applicative f => f (a -> b) -> a -> Boolean
+interchangeLaw fab a = l == r
+  where
+  l = fab <*> pure a
+
+  r = pure (\ab -> ab a) <*> fab

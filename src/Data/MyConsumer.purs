@@ -2,10 +2,16 @@ module Data.MyConsumer where
 
 import Prelude
 import Class.MyFunctor (class MyFunctor)
-import Helper (notImplemented)
 
 data MyConsumer a
-  = MyConsumer (a -> Unit)
+  = MyConsumer
 
 instance functorMyConsumer :: MyFunctor MyConsumer where
-  fmap = notImplemented
+  fmap :: forall a b. (a -> b) -> MyConsumer a -> MyConsumer b
+  fmap _ MyConsumer = MyConsumer
+
+to :: (forall a. a -> Unit) -> Unit
+to _ = unit
+
+from :: Unit -> (forall a. a -> Unit)
+from _ _ = unit

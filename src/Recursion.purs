@@ -7,6 +7,7 @@ import Data.Tuple (Tuple(..))
 import Data.Unfoldable (class Unfoldable, class Unfoldable1, unfoldr, unfoldr1)
 import Homework.Todo (todo, todo')
 import Unsafe.Coerce (unsafeCoerce)
+import Class.MyFunctor (class MyFunctor, fmap)
 
 foo :: Int -> String
 foo i = case i of
@@ -146,8 +147,10 @@ drop n xs = todo "please implement"
 -- | map (_ * 2) Empty = Empty
 -- | map identity (1 : 3 : 7 : Empty) = (1 : 3 : 7 : Empty)
 -- | ```
-map :: ∀ a b. (a -> b) -> List a -> List b
-map as = todo "please implement"
+instance myFunctorList :: MyFunctor List where
+  fmap f = case _ of
+    Empty -> Empty
+    Cons h t -> Empty
 
 -- | Filter elements of a list using provided predicate. 
 -- | (Any function of type `a -> Boolean` is called a "predicate")

@@ -1,6 +1,7 @@
 module Data.MyIdentity where
 
 import Prelude
+import Class.MyFunctor (class MyFunctor)
 import Data.Foldable (class Foldable)
 import Data.Generic.Rep (class Generic)
 
@@ -32,3 +33,7 @@ instance foldableMyMaybe :: Foldable MyIdentity where
   foldl f b (MyIdentity a) = f b a
   foldMap :: forall a m. Monoid m => (a -> m) -> MyIdentity a -> m
   foldMap f (MyIdentity a) = f a
+
+instance myFunctor :: MyFunctor MyIdentity where
+  fmap :: forall a b. (a -> b) -> (MyIdentity a -> MyIdentity b)
+  fmap f (MyIdentity a) = MyIdentity (f a)

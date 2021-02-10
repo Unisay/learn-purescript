@@ -1,8 +1,8 @@
 module Data.BinTree where
 
 import Prelude
-import PrettyPrinter
-import Data.Maybe (Maybe(..), maybe)
+import PrettyPrinter (Doc, layout, line, nest, text)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
 
 newtype BinTree a

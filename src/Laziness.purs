@@ -2,10 +2,9 @@ module Laziness where
 
 import Prelude
 import Data.Custom.Thunk (Thunk, force, th)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe')
 import Effect.Console (log)
 import Effect.Unsafe (unsafePerformEffect)
-import Homework.Todo (todo)
 
 {-
 
@@ -77,13 +76,13 @@ toLazyChoice ::
   ∀ a.
   (a -> a -> Boolean -> a) ->
   Thunk a -> Thunk a -> Boolean -> Thunk a
-toLazyChoice f = todo "Homework"
+toLazyChoice f a1 a2 b = th \_ -> f (force a1) (force a2) b
 
 fromLazyChoice ::
   ∀ a.
   (Thunk a -> Thunk a -> Boolean -> Thunk a) ->
-  (a -> a -> Boolean -> a)
-fromLazyChoice f = todo "Homework"
+  a -> a -> Boolean -> a
+fromLazyChoice f a1 a2 b = force $ f (th \_ -> a1) (th \_ -> a2) b
 
 -- Homework
 -- testThunk1 :: Unit -> Int
@@ -112,4 +111,4 @@ heavyExpr = th \_ -> go 0
 -- | 100
 -- | ```
 alt :: forall a. Maybe a -> Thunk a -> a
-alt ma d = todo "Homework"
+alt ma d = fromMaybe' (\_ -> force d) ma

@@ -1,11 +1,11 @@
 module Applicative where
 
 import Data.Unit
+import Prelude
 import Control.Apply (class Functor, map)
 import Data.BooleanAlgebra (not)
--- import Data.Maybe (Maybe(..))
 import Data.Semiring (add)
-import Data.Tuple (Tuple)
+import Data.Tuple (Tuple(..))
 import Homework.Todo (todo)
 
 invert :: forall f. Functor f => f Boolean -> f Boolean
@@ -62,11 +62,13 @@ class
   mapply :: forall a b. f a -> f b -> f (Tuple a b)
 
 instance applicativeMonoidal :: Applicative f => Monoidal f where
-  munit = todo "Implement using Applicative functions (map | pure | apply)"
-  mapply _ _ = todo "Implement using Applicative functions (map | pure | apply)"
+  munit = pure unit
+  mapply = lift2 Tuple
 
 instance monoidalApply :: Monoidal f => Apply f where
-  apply _ _ = todo "Implement using Monoidal functions (map | munit | mapply)"
+  apply :: forall x y. f (x -> y) -> f x -> f y
+  apply fxy fx = map (\(Tuple xy x) -> xy x) (mapply fxy fx)
 
 instance monoidalApplicative :: Monoidal f => Applicative f where
-  pure = todo "Implement using Monoidal functions (map | munit | mapply)"
+  pure :: forall a. a -> f a
+  pure a = map (const a) munit

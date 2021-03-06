@@ -18,6 +18,9 @@ type Natural0
 newtype Natural1
   = Natural1 Natural
 
+instance showNatural1 :: Show Natural1 where
+  show (Natural1 x) = show x
+
 type User
   = { nickname :: Nickname
     , sex :: Sex
@@ -44,26 +47,6 @@ instance showSex :: Show Sex where
 kidsParser :: Parser Natural0
 kidsParser = naturalParser
 
-ageParser :: Parser Natural1
-ageParser = Parser pf
-  where
-  pf ::
-    NonEmptyArray Token ->
-    { remainder :: Array Token
-    , result :: Result Natural1
-    }
-  pf tokens =
-    { remainder: ?ArrayToken
-    , result: nat0ToNat1 ?natural
-    }
-
-  nat0ToNat1 :: Natural0 -> Result Natural1
-  nat0ToNat1 x =
-    if x == zero then
-      Err "Expected non-zero nat"
-    else
-      Ok (Natural1 x)
-
 nicknameParser :: Parser Nickname
 nicknameParser = Parser parsingFunction
   where
@@ -81,6 +64,28 @@ nicknameParser = Parser parsingFunction
       { remainder: NE.toArray tokens
       , result: Err "Nickname must not contain only digits"
       }
+
+ageParser :: Parser Natural1
+ageParser =
+  Parser \newTokens ->
+    let
+      Parser originalParsingFunction = naturalParser
+
+      originalRecord = originalParsingFunction newTokens
+    in
+      { remainder: originalRecord.remainder
+      , result:
+          nat0ToResNat1 originalRecord.result
+      }
+
+nat0ToResNat1 :: Result Natural0 -> Result Natural1
+nat0ToResNat1 = case _ of
+  Err e -> Err e
+  Ok x ->
+    if x == zero then
+      Err "Expected non-zero nat"
+    else
+      Ok $ Natural1 x
 
 sexParser :: Parser Sex
 sexParser =

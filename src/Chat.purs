@@ -2,7 +2,12 @@ module Chat where
 
 import Prelude
 import Applicative.Parsing.Parser.Standard (naturalParser, singleParser)
-import Applicative.Parsing.Types (Parser(..), ParsingFunction, Result(..), Token(..))
+import Applicative.Parsing.Types
+  ( Parser(..)
+  , ParsingFunction
+  , Result(..)
+  , Token(..)
+  )
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Array.NonEmpty as NE
 import Data.Maybe (Maybe)
@@ -44,6 +49,17 @@ instance showSex :: Show Sex where
     Male -> "Male"
     Female -> "Female"
 
+-- Parsing:
+--                      /hello Yura M 38 2
+-- /hello Chiki M 39 1
+userParser :: Parser User
+userParser = ado
+  nickname <- nicknameParser
+  sex <- sexParser
+  age <- ageParser
+  kids <- kidsParser
+  in { nickname, sex, age, kids }
+
 kidsParser :: Parser Natural0
 kidsParser = naturalParser
 
@@ -77,15 +93,15 @@ ageParser =
       , result:
           nat0ToResNat1 originalRecord.result
       }
-
-nat0ToResNat1 :: Result Natural0 -> Result Natural1
-nat0ToResNat1 = case _ of
-  Err e -> Err e
-  Ok x ->
-    if x == zero then
-      Err "Expected non-zero nat"
-    else
-      Ok $ Natural1 x
+  where
+  nat0ToResNat1 :: Result Natural0 -> Result Natural1
+  nat0ToResNat1 = case _ of
+    Err e -> Err e
+    Ok x ->
+      if x == zero then
+        Err "Expected non-zero nat"
+      else
+        Ok $ Natural1 x
 
 sexParser :: Parser Sex
 sexParser =
@@ -104,18 +120,3 @@ sexParser =
               ch -> Err $ "Expected 'M' | 'F' but got " <> show ch
             Err error -> Err error
       }
-
--- sexParser = Parser parsingFunction
---   where
---   parsingFunction :: ParsingFunction Sex
---   parsingFunction tokens =
---     { remainder: unconsed.tail
---     , result:
---         case unconsed.head of
---           Single 'M' -> Ok Male
---           Single 'F' -> Ok Female
---           token -> Err $ "Expected 'M' | 'F' but got " <> show token
---     }
---     where
---     unconsed :: { head :: Token, tail :: Array Token }
---     unconsed = NE.uncons tokens

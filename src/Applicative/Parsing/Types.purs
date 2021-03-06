@@ -2,6 +2,9 @@ module Applicative.Parsing.Types where
 
 import Prelude
 import Data.Array.NonEmpty (NonEmptyArray)
+import Data.Array.NonEmpty as NA
+import Data.Array.NonEmpty as NE
+import Data.Maybe (Maybe(..))
 import Data.Natural (Natural)
 
 data Token
@@ -48,3 +51,28 @@ instance functorParser :: Functor Parser where
         { remainder: originalRecord.remainder
         , result: f <$> originalRecord.result
         }
+
+instance applyParser :: Apply Parser where
+  apply :: forall a b. Parser (a -> b) -> Parser a -> Parser b
+  apply (Parser pfab) (Parser pfa) = Parser pfb
+    where
+    pfb neat = case pfab neat of
+      record1 -> case NA.fromArray record1.remainder of
+        Nothing ->
+          { remainder: record1.remainder
+          , result: Err "Premature end of input"
+          }
+        Just rem -> case pfa rem of
+          { result, remainder } ->
+            { remainder
+            , result:
+                case record1.result, result of
+                  Err e1, Err e2 -> Err (e1 <> "; " <> e2)
+                  Err e, Ok _ -> Err e
+                  Ok _, Err e -> Err e
+                  Ok ab, Ok a -> Ok (ab a)
+            }
+
+instance applicativeParser :: Applicative Parser where
+  pure :: forall a. a -> Parser a
+  pure x = Parser \neat -> { remainder: NE.toArray neat, result: Ok x }

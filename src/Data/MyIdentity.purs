@@ -3,7 +3,6 @@ module Data.MyIdentity where
 import Prelude
 import Class.MyFunctor (class MyFunctor)
 import Data.Foldable (class Foldable)
-import Data.Generic.Rep (class Generic)
 
 newtype MyIdentity a
   = MyIdentity a

@@ -2,7 +2,6 @@ module Data.MyPhantom where
 
 import Prelude
 import Data.Foldable (class Foldable)
-import Data.Generic.Rep (class Generic)
 
 data MyPhantom a
   = MyPhantom

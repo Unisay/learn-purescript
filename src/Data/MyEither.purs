@@ -2,7 +2,9 @@ module Data.MyEither where
 
 import Prelude
 import Class.MyFunctor (class MyFunctor)
+import Data.Generic.Rep (class Generic)
 import Data.MyMaybe (MyMaybe(Some, None), isSome)
+import Data.Show.Generic (genericShow)
 import Helper (notImplemented)
 
 data MyEither a b

@@ -1,15 +1,18 @@
 module Applicative.Parsing.Types where
 
 import Prelude
+import Control.Alt (class Alt)
+import Control.Plus (class Plus)
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Array.NonEmpty as NA
 import Data.Array.NonEmpty as NE
 import Data.Maybe (Maybe(..))
 import Data.Natural (Natural)
+import Data.String (CodePoint)
 
 data Token
-  = Lexeme (NonEmptyArray Char)
-  | Single Char
+  = Lexeme (NonEmptyArray CodePoint)
+  | Single CodePoint
   | Number Natural
 
 instance showToken :: Show Token where
@@ -76,3 +79,18 @@ instance applyParser :: Apply Parser where
 instance applicativeParser :: Applicative Parser where
   pure :: forall a. a -> Parser a
   pure x = Parser \neat -> { remainder: NE.toArray neat, result: Ok x }
+
+instance parserAlt :: Alt Parser where
+  alt :: forall a. Parser a -> Parser a -> Parser a
+  alt (Parser pf1) (Parser pf2) =
+    Parser \tokens ->
+      let
+        pfr1 = pf1 tokens
+      in
+        case pfr1.result of
+          Ok _ -> pfr1
+          Err _ -> pf2 tokens
+
+instance plusParser :: Plus Parser where
+  empty :: forall a. Parser a
+  empty = Parser \tokens -> { result: Err "", remainder: NE.toArray tokens }

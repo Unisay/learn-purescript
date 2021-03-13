@@ -2,8 +2,9 @@ module Data.MyPhantom where
 
 import Prelude
 import Data.Foldable (class Foldable)
+import Data.Generic.Rep (class Generic)
 
-data MyPhantom a
+data MyPhantom (a :: Type)
   = MyPhantom
 
 derive instance genericMyPhantom :: Generic (MyPhantom a) _

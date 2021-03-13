@@ -2,8 +2,6 @@ module Example where
 
 import Prelude
 import Data.Tuple
-import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
 
 {-
 

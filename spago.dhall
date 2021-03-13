@@ -12,7 +12,6 @@
   , "lazy"
   , "naturals"
   , "node-readline"
-  , "generics-rep"
   , "partial"
   , "unfoldable"
   , "unicode"

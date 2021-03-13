@@ -1,7 +1,9 @@
 module Example where
 
 import Prelude
-import Data.Tuple
+import Data.Tuple (Tuple(..), curry, uncurry)
+import Data.Generic.Rep (class Generic)
+import Data.Show.Generic (genericShow)
 
 {-
 

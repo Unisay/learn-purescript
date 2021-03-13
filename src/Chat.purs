@@ -1,18 +1,14 @@
 module Chat where
 
 import Prelude
-import Applicative.Parsing.Parser.Standard (naturalParser, singleParser)
-import Applicative.Parsing.Types
-  ( Parser(..)
-  , ParsingFunction
-  , Result(..)
-  , Token(..)
-  )
-import Data.Array.NonEmpty (NonEmptyArray)
+import Applicative.Parsing.Parser.Standard (keyword, naturalParser, singleParser)
+import Applicative.Parsing.Types (Parser(..), ParsingFunction, Result(..), Token(..))
+import Control.Alt ((<|>))
 import Data.Array.NonEmpty as NE
 import Data.Maybe (Maybe)
 import Data.Natural (Natural)
-import Data.String.CodeUnits as String
+import Data.String (codePointFromChar)
+import Data.String.CodePoints as String
 
 type Nickname
   = String
@@ -33,6 +29,19 @@ type User
     , kids :: Natural0
     }
 
+data Command'
+  = Hello'
+  | List'
+  | Kiss'
+  | Quit'
+
+instance showCommandPrime :: Show Command' where
+  show = case _ of
+    Hello' -> "Hello'"
+    List' -> "List'"
+    Kiss' -> "Kiss'"
+    Quit' -> "Quit'"
+
 data Command
   = Hello User
   | List (Maybe Sex)
@@ -49,6 +58,39 @@ instance showSex :: Show Sex where
     Male -> "Male"
     Female -> "Female"
 
+commandPrimeParser :: Parser Command'
+commandPrimeParser =
+  Hello' `for` "hello"
+    <|> List' `for` "list"
+    <|> Kiss' `for` "kiss"
+    <|> Quit' `for` "quit"
+  where
+  -- homework: rewrite without for, use <$   or $>
+  for cmd kw = map (const cmd) (keyword kw)
+
+-- Parser \tokens ->
+--   let
+--     err msg = { remainder: NE.toArray tokens, result: Err msg }
+--   in
+--     case NE.uncons tokens of
+--       { head: Lexeme neac, tail } ->
+--         let
+--           ok cmd = { result: Ok cmd, remainder: tail }
+--         in
+--           if NE.head neac /= codePointFromChar '/' then
+--             { remainder: NE.toArray tokens
+--             , result: Err "Invalid command: all commands start with /"
+--             }
+--           else case String.fromCodePointArray (NE.tail neac) of
+--             "hello" -> ok Hello'
+--             "list" -> ok List'
+--             "kiss" -> ok Kiss'
+--             "quit" -> ok Quit'
+--             _ -> err "Unknown command: hello | list | kiss | quit !"
+--       _ -> err "Malformed command!"
+-- commandParser :: Parser Command
+-- commandParser = ?commandParser
+-- slashParser :: Parser 
 -- Parsing:
 --                      /hello Yura M 38 2
 -- /hello Chiki M 39 1
@@ -70,7 +112,7 @@ nicknameParser = Parser parsingFunction
   parsingFunction tokens = case NE.uncons tokens of
     { head: Lexeme neac, tail } ->
       { remainder: tail
-      , result: Ok ((NE.toArray >>> String.fromCharArray) neac)
+      , result: Ok ((NE.toArray >>> String.fromCodePointArray) neac)
       }
     { head: Single c, tail } ->
       { remainder: tail
@@ -115,8 +157,10 @@ sexParser =
       , result:
           case originalRecord.result of
             Ok single -> case single of
-              'M' -> Ok Male
-              'F' -> Ok Female
-              ch -> Err $ "Expected 'M' | 'F' but got " <> show ch
+              cp
+                | codePointFromChar 'M' == cp -> Ok Male
+              cp
+                | codePointFromChar 'F' == cp -> Ok Female
+              cp -> Err $ "Expected 'M' | 'F' but got " <> show cp
             Err error -> Err error
       }

@@ -3,29 +3,30 @@ module Applicative.Parsing.Lexer
   ) where
 
 import Prelude
-import Data.Array as A
-import Data.String.NonEmpty as NES
-import Data.Foldable as F
 import Applicative.Parsing.Types (Token(..))
+import Data.Array as A
 import Data.Array.NonEmpty as NE
+import Data.Array.NonEmpty as NEA
+import Data.CodePoint.Unicode (isSpace)
+import Data.Foldable as F
+import Data.Int as Int
 import Data.Maybe (Maybe(Just, Nothing))
 import Data.Natural (intToNat)
-import Data.Array.NonEmpty as NEA
-import Data.String.CodeUnits as String
-import Data.Char.Unicode (isSpace)
-import Data.String.NonEmpty.CodeUnits (toCharArray)
-import Data.Int as Int
+import Data.String (CodePoint)
+import Data.String.CodePoints as String
+import Data.String.NonEmpty as NES
+import Data.String.NonEmpty.CodePoints (toCodePointArray)
 
 type Acc
-  = { lexeme :: Array Char, tokens :: Array Token }
+  = { lexeme :: Array CodePoint, tokens :: Array Token }
 
 lexer :: NES.NonEmptyString -> Array Token
-lexer s = (go initialAcc (toCharArray s)).tokens
+lexer s = (go initialAcc (toCodePointArray s)).tokens
   where
   initialAcc :: Acc
   initialAcc = { lexeme: [], tokens: [] }
 
-  go :: Acc -> Array Char -> Acc
+  go :: Acc -> Array CodePoint -> Acc
   go prev arr = case A.uncons arr of
     Nothing -> flush prev
     Just { head, tail }
@@ -48,7 +49,7 @@ flush acc' =
             maybeNum =
               intToNat
                 <$> ( NEA.toArray
-                      >>> String.fromCharArray
+                      >>> String.fromCodePointArray
                       >>> Int.fromString
                   )
                     nea

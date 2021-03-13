@@ -1,14 +1,21 @@
 module Minotaur where
 
-import Control.Lazy (fix)
 import Prelude
+import Prim hiding (Row)
+import Control.Lazy (fix)
 import Control.MonadZero (guard)
 import Data.Array ((!!))
 import Data.Array as A
+import Data.Bounded.Generic (genericBottom, genericTop)
 import Data.Enum (class Enum, pred, succ, upFromIncluding)
+import Data.Enum.Generic (genericPred, genericSucc)
+import Data.Eq.Generic (genericEq)
+import Data.Generic.Rep (class Generic)
 import Data.Int (rem)
 import Data.Maybe (Maybe(..), fromJust, fromMaybe)
 import Data.Natural (Natural, intToNat, natToInt)
+import Data.Ord.Generic (genericCompare)
+import Data.Show.Generic (genericShow)
 import Partial.Unsafe (unsafeCrashWith, unsafePartial)
 import Random.LCG (lcgNext)
 import Random.PseudoRandom (class Random, Seed, mkSeed, random, randomRs)

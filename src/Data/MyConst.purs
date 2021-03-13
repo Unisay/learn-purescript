@@ -2,6 +2,7 @@ module Data.MyConst where
 
 import Prelude
 import Class.MyFunctor (class MyFunctor)
+import Data.Generic.Rep
 
 data MyConst c a
   = MyConst c

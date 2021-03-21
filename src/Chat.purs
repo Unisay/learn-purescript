@@ -4,8 +4,9 @@ import Prelude
 import Applicative.Parsing.Parser.Standard (keyword, naturalParser, singleParser)
 import Applicative.Parsing.Types (Parser(..), ParsingFunction, Result(..), Token(..))
 import Control.Alt ((<|>))
+import Data.Array (uncons)
 import Data.Array.NonEmpty as NE
-import Data.Maybe (Maybe)
+import Data.Maybe (Maybe(..), maybe, optional)
 import Data.Natural (Natural)
 import Data.String (codePointFromChar)
 import Data.String.CodePoints as String
@@ -29,19 +30,6 @@ type User
     , kids :: Natural0
     }
 
-data Command'
-  = Hello'
-  | List'
-  | Kiss'
-  | Quit'
-
-instance showCommandPrime :: Show Command' where
-  show = case _ of
-    Hello' -> "Hello'"
-    List' -> "List'"
-    Kiss' -> "Kiss'"
-    Quit' -> "Quit'"
-
 data Command
   = Hello User
   | List (Maybe Sex)
@@ -49,51 +37,47 @@ data Command
   | Kick Nickname
   | Quit
 
+instance showCommand :: Show Command where
+  show = case _ of
+    Hello user -> "hello " <> show user
+    List sex -> "list " <> maybe "" show sex
+    Kiss nick -> "kiss " <> show nick
+    Kick nick -> "kick " <> show nick
+    Quit -> "quit"
+
 data Sex
   = Male
   | Female
 
 instance showSex :: Show Sex where
   show = case _ of
-    Male -> "Male"
-    Female -> "Female"
+    Male -> "M"
+    Female -> "F"
 
-commandPrimeParser :: Parser Command'
-commandPrimeParser =
-  Hello' `for` "hello"
-    <|> List' `for` "list"
-    <|> Kiss' `for` "kiss"
-    <|> Quit' `for` "quit"
-  where
-  -- homework: rewrite without for, use <$   or $>
-  for cmd kw = map (const cmd) (keyword kw)
+commandParser :: Parser Command
+commandParser =
+  parserCommandHello
+    <|> parserCommandList
+    <|> parserCommandKiss
+    <|> parserCommandKick
+    <|> parserCommandQuit
 
--- Parser \tokens ->
---   let
---     err msg = { remainder: NE.toArray tokens, result: Err msg }
---   in
---     case NE.uncons tokens of
---       { head: Lexeme neac, tail } ->
---         let
---           ok cmd = { result: Ok cmd, remainder: tail }
---         in
---           if NE.head neac /= codePointFromChar '/' then
---             { remainder: NE.toArray tokens
---             , result: Err "Invalid command: all commands start with /"
---             }
---           else case String.fromCodePointArray (NE.tail neac) of
---             "hello" -> ok Hello'
---             "list" -> ok List'
---             "kiss" -> ok Kiss'
---             "quit" -> ok Quit'
---             _ -> err "Unknown command: hello | list | kiss | quit !"
---       _ -> err "Malformed command!"
--- commandParser :: Parser Command
--- commandParser = ?commandParser
--- slashParser :: Parser 
--- Parsing:
---                      /hello Yura M 38 2
--- /hello Chiki M 39 1
+parserCommandHello :: Parser Command
+parserCommandHello = Hello <$ keyword "!hello" <*> userParser
+
+parserCommandList :: Parser Command
+parserCommandList = (keyword "!list" $> List) <*> optional sexParser
+
+parserCommandKiss :: Parser Command
+parserCommandKiss = (keyword "!kiss" $> Kiss) <*> nicknameParser
+
+parserCommandKick :: Parser Command
+parserCommandKick = (keyword "!kick" $> Kick) <*> nicknameParser
+
+parserCommandQuit :: Parser Command
+parserCommandQuit = keyword "!quit" $> Quit
+
+-- !hello Chiki M 39 1
 userParser :: Parser User
 userParser = ado
   nickname <- nicknameParser
@@ -109,18 +93,22 @@ nicknameParser :: Parser Nickname
 nicknameParser = Parser parsingFunction
   where
   parsingFunction :: ParsingFunction Nickname
-  parsingFunction tokens = case NE.uncons tokens of
-    { head: Lexeme neac, tail } ->
+  parsingFunction tokens = case uncons tokens of
+    Just { head: Lexeme neac, tail } ->
       { remainder: tail
       , result: Ok ((NE.toArray >>> String.fromCodePointArray) neac)
       }
-    { head: Single c, tail } ->
+    Just { head: Single c, tail } ->
       { remainder: tail
       , result: Ok (String.singleton c)
       }
-    _ ->
-      { remainder: NE.toArray tokens
+    Just _ ->
+      { remainder: tokens
       , result: Err "Nickname must not contain only digits"
+      }
+    Nothing ->
+      { remainder: tokens
+      , result: Err "Expected Nickname"
       }
 
 ageParser :: Parser Natural1

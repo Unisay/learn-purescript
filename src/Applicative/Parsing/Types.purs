@@ -2,6 +2,7 @@ module Applicative.Parsing.Types where
 
 import Prelude
 import Control.Alt (class Alt)
+import Control.Alternative (class Alternative)
 import Control.Plus (class Plus)
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Natural (Natural)
@@ -82,6 +83,8 @@ instance parserAlt :: Alt Parser where
         case pfr1.result of
           Ok _ -> pfr1
           Err _ -> pf2 tokens
+
+instance alternativeParser :: Alternative Parser
 
 instance plusParser :: Plus Parser where
   empty :: forall a. Parser a

@@ -6,6 +6,7 @@ import Applicative.Parsing.Types (Parser(..), ParsingFunction, Result(..), Token
 import Control.Alt ((<|>))
 import Data.Array (uncons)
 import Data.Array.NonEmpty as NE
+import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Maybe (Maybe(..), maybe, optional)
 import Data.Natural (Natural)
 import Data.String (codePointFromChar)
@@ -56,26 +57,42 @@ instance showSex :: Show Sex where
 
 commandParser :: Parser Command
 commandParser =
-  parserCommandHello
-    <|> parserCommandList
-    <|> parserCommandKiss
-    <|> parserCommandKick
-    <|> parserCommandQuit
+  choice
+    [ parserCommandHello
+    , parserCommandKiss
+    , parserCommandKick
+    , parserCommandQuit
+    , parserCommandList
+    ]
+  where
+  -- Example using ado notation
+  parserCommandHello :: Parser Command
+  parserCommandHello = ado
+    keyword "!hello"
+    user <- userParser
+    in Hello user
 
-parserCommandHello :: Parser Command
-parserCommandHello = Hello <$ keyword "!hello" <*> userParser
+  -- Example using `apply` operator
+  parserCommandList :: Parser Command
+  parserCommandList = (keyword "!list" $> List) <*> optional sexParser
 
-parserCommandList :: Parser Command
-parserCommandList = (keyword "!list" $> List) <*> optional sexParser
+  -- Example using `applyRight` operator
+  parserCommandKiss :: Parser Command
+  parserCommandKiss = keyword "!kiss" *> map Kiss nicknameParser
 
-parserCommandKiss :: Parser Command
-parserCommandKiss = (keyword "!kiss" $> Kiss) <*> nicknameParser
+  -- Example using `applyLeft` operator
+  parserCommandKick :: Parser Command
+  parserCommandKick = map Kick nicknameParser <* keyword "!kick"
 
-parserCommandKick :: Parser Command
-parserCommandKick = (keyword "!kick" $> Kick) <*> nicknameParser
+  parserCommandQuit :: Parser Command
+  parserCommandQuit = keyword "!quit" $> Quit
 
-parserCommandQuit :: Parser Command
-parserCommandQuit = keyword "!quit" $> Quit
+-- | Homework: implement choice 
+-- choice [p1] == p1
+-- choice [p1, p2, p3] == p1 <|> p2 <|> p3
+-- choice [p1, p2, p3, p4] == p1 <|> p2 <|> p3 <|> p4
+choice :: forall a. NonEmptyArray (Parser a) -> Parser a
+choice parsers = todo "implement"
 
 -- !hello Chiki M 39 1
 userParser :: Parser User

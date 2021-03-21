@@ -4,9 +4,6 @@ import Prelude
 import Control.Alt (class Alt)
 import Control.Plus (class Plus)
 import Data.Array.NonEmpty (NonEmptyArray)
-import Data.Array.NonEmpty as NA
-import Data.Array.NonEmpty as NE
-import Data.Maybe (Maybe(..))
 import Data.Natural (Natural)
 import Data.String (CodePoint)
 
@@ -22,7 +19,7 @@ instance showToken :: Show Token where
     Number nat -> "Number " <> show nat
 
 type ParsingFunction r
-  = NonEmptyArray Token ->
+  = Array Token ->
     { remainder :: Array Token
     , result :: Result r
     }
@@ -60,25 +57,20 @@ instance applyParser :: Apply Parser where
   apply (Parser pfab) (Parser pfa) = Parser pfb
     where
     pfb neat = case pfab neat of
-      record1 -> case NA.fromArray record1.remainder of
-        Nothing ->
-          { remainder: record1.remainder
-          , result: Err "Premature end of input"
+      record1 -> case pfa record1.remainder of
+        { result, remainder } ->
+          { remainder
+          , result:
+              case record1.result, result of
+                Err e1, Err e2 -> Err (e1 <> "; " <> e2)
+                Err e, Ok _ -> Err e
+                Ok _, Err e -> Err e
+                Ok ab, Ok a -> Ok (ab a)
           }
-        Just rem -> case pfa rem of
-          { result, remainder } ->
-            { remainder
-            , result:
-                case record1.result, result of
-                  Err e1, Err e2 -> Err (e1 <> "; " <> e2)
-                  Err e, Ok _ -> Err e
-                  Ok _, Err e -> Err e
-                  Ok ab, Ok a -> Ok (ab a)
-            }
 
 instance applicativeParser :: Applicative Parser where
   pure :: forall a. a -> Parser a
-  pure x = Parser \neat -> { remainder: NE.toArray neat, result: Ok x }
+  pure x = Parser \neat -> { remainder: neat, result: Ok x }
 
 instance parserAlt :: Alt Parser where
   alt :: forall a. Parser a -> Parser a -> Parser a
@@ -93,4 +85,4 @@ instance parserAlt :: Alt Parser where
 
 instance plusParser :: Plus Parser where
   empty :: forall a. Parser a
-  empty = Parser \tokens -> { result: Err "", remainder: NE.toArray tokens }
+  empty = Parser \tokens -> { result: Err "", remainder: tokens }

@@ -1,0 +1,33 @@
+{
+  "name": "learn-purescript",
+  "version": "1.0.0",
+  "description": "Playground for learning Purescript",
+  "main": "index.js",
+  "directories": {
+    "doc": "doc",
+    "test": "test"
+  },
+  "scripts": {
+    "test": "spago test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Unisay/learn-purescript.git"
+  },
+  "keywords": [
+    "purescript",
+    "fp",
+    "spago"
+  ],
+  "author": "Yuriy Lazarev",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Unisay/learn-purescript/issues"
+  },
+  "homepage": "https://github.com/Unisay/learn-purescript#readme",
+  "devDependencies": {
+    "purescript": "^0.14.0",
+    "purty": "^7.0.0",
+    "spago": "^0.19.1"
+  }
+}

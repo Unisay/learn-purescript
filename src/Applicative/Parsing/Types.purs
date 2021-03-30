@@ -71,7 +71,7 @@ instance applyParser :: Apply Parser where
 
 instance applicativeParser :: Applicative Parser where
   pure :: forall a. a -> Parser a
-  pure x = Parser \neat -> { remainder: neat, result: Ok x }
+  pure x = Parser \remainder -> { result: Ok x, remainder }
 
 instance parserAlt :: Alt Parser where
   alt :: forall a. Parser a -> Parser a -> Parser a

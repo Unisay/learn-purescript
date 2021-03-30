@@ -60,3 +60,6 @@ keyword expected =
           else
             err $ "Unexpected code point, " <> expecting
         _ -> err $ "Unexpected string, " <> expecting
+
+success :: Parser Unit
+success = pure unit

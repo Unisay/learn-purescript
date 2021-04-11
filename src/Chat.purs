@@ -3,13 +3,15 @@ module Chat where
 import Prelude
 import Applicative.Parsing.Parser.Standard (keyword, naturalParser, singleParser)
 import Applicative.Parsing.Types (Parser(..), ParsingFunction, Result(..), Token(..))
+import Control.Alt ((<|>))
 import Data.Array (uncons)
 import Data.Array.NonEmpty as NE
 import Data.Maybe (Maybe(..), maybe, optional)
 import Data.Natural (Natural)
-import Data.Semigroup.Foldable (class Foldable1)
+import Data.Semigroup.Foldable (class Foldable1, foldl1, foldr1)
 import Data.String (codePointFromChar)
 import Data.String.CodePoints as String
+import Data.Traversable (sequence)
 import Homework.Todo (todo)
 
 type Nickname
@@ -91,8 +93,9 @@ commandParser =
 -- choice [p1] == p1
 -- choice [p1, p2, p3] == p1 <|> p2 <|> p3
 -- choice [p1, p2, p3, p4] == p1 <|> p2 <|> p3 <|> p4
-choice :: forall f a. Foldable1 f => f (Parser a) -> Parser a
-choice parsers = todo "implement"
+-- forall a. (a -> a -> a) -> t a -> a
+choice :: forall t x. Foldable1 t => t (Parser x) -> Parser x
+choice = foldr1 (<|>) 
 
 -- !hello Chiki M 39 1
 userParser :: Parser User
@@ -169,3 +172,7 @@ sexParser =
               cp -> Err $ "Expected 'M' | 'F' but got " <> show cp
             Err error -> Err error
       }
+
+-- sequence [keyword "A" $> 1, keyword "B" $> 42, keyword "C" $> 119] `parseStr` "A B C" OK: [1,42,119]
+sequence :: forall a. Array (Parser a) -> Parser (Array a)
+sequence = todo "pls implement"

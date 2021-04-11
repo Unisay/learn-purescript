@@ -8,7 +8,11 @@
     "test": "test"
   },
   "scripts": {
-    "test": "spago test"
+    "test": "spago test",
+    "web-dialog-build": "spago bundle-app --main App.Web.Dialog.Main --to dist/App/Web/Dialog/main.js",
+    "web-dialog-watch": "spago bundle-app --watch --main App.Web.Dialog.Main --to dist/App/Web/Dialog/main.js",
+    "web-dialog-serve": "http-server dist/App/Web/Dialog -o",
+    "web-dialog-start": "npm run web-dialog-build && npm run web-dialog-serve"
   },
   "repository": {
     "type": "git",
@@ -26,6 +30,7 @@
   },
   "homepage": "https://github.com/Unisay/learn-purescript#readme",
   "devDependencies": {
+    "http-server": "^0.12.3",
     "purescript": "^0.14.0",
     "purty": "^7.0.0",
     "spago": "^0.19.1"

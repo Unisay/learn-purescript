@@ -108,7 +108,7 @@ putString :: String -> Effect Unit
 
 Графически эти действия выглядят так: (the box for putString takes an extra input for the Char argument):
 
-`````
+```
 getString :: Effect String
 
       ╔═══════════╗ String
@@ -145,12 +145,11 @@ bind getString putString
 Чтоб достигнуть этого объединения мы используем функцию-склейку, или функцию-комбинатор,
 которая тоже предоставляется как примитив:
 
-
-````purescript
+```purescript
 bind :: forall a b. Effect a -> (a -> Effect b) -> Effect b
 
 infixl 1 bind as >>=
-`````
+```
 
 ```purescript
 echo :: Effect Unit
@@ -192,7 +191,7 @@ echoDup = getString >>= (\s -> (putString s >> putString s))
 В этом примере все скобки не являются обязательными, т.к. лямбда распространяется слева направо, от косой черты и до самого конца строки, и вы часто можете встретить такое форматирование:
 
 ```purescript
-echoDup :: IO ()
+echoDup :: Effect Unit
 echoDup = getString   >>= \s ->
           putString s >>
           putString s
@@ -243,12 +242,11 @@ getTwoStrings = getString >>= \s1 ->
 
 ```purescript
 getLines :: Effect (Array String)
-getLines = getString >>= \line ->
-           if line == "." then
-             pure []
-           else
-             getLines >>= \lines ->
-             pure (line : lines)
+getLines =
+  getString >>= \line ->
+    if line == "." then pure []
+    else
+     getLines >>= \lines -> pure (line : lines)
 ```
 
 В этом примере, `[]` это способ записи пустого массива в PureScript a `:`

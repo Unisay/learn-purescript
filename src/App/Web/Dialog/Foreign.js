@@ -6,9 +6,9 @@ function say(message) {
 
 exports.ask = (question) => {
   return () => {
-    say("Question: " + question);
+    // say("Question: " + question);
     var answer = prompt(question);
-    say("Answer: " + answer);
+    // say("Answer: " + answer);
     return answer;
   };
 };

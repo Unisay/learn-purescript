@@ -4,7 +4,8 @@ import Prelude
 import Control.Alt (class Alt)
 import Control.Alternative (class Alternative)
 import Control.Plus (class Plus)
-import Data.Array.NonEmpty (NonEmptyArray)
+import Data.Array.NonEmpty (NonEmptyArray, findLastIndex)
+import Data.Either.Nested (at2)
 import Data.Natural (Natural)
 import Data.String (CodePoint)
 
@@ -28,6 +29,14 @@ type ParsingFunction r
 data Result a
   = Ok a
   | Err String
+
+instance eqResult :: Eq a => Eq (Result a) where
+  eq :: Result a -> Result a -> Boolean
+  eq = case _, _ of
+    Ok a1, Ok a2 -> a1 == a2
+    Ok _, Err _ -> false
+    Err _, Ok _ -> false
+    Err e1, Err e2 -> e1 == e2
 
 instance functorResult :: Functor Result where
   map f = case _ of

@@ -12,6 +12,21 @@ import Effect (Effect)
 main :: Effect Unit
 main = do
   tell "Диалог начался."
+  whenM yesOrNo talk
+
+yesOrNo :: Effect Boolean
+yesOrNo = strToBool <$> ask "Поговорим?"
+  where
+  strToBool :: String -> Boolean
+  strToBool = case _ of
+    "Y" -> true
+    "Yes" -> true
+    "YES" -> true
+    "yes" -> true
+    _ -> false
+
+talk :: Effect Unit
+talk = do
   name <- ask "Как тебя зовут?"
   answer <- askAge
   case answer of

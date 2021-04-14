@@ -3,9 +3,9 @@ module Applicative.Parsing.Types where
 import Prelude
 import Control.Alt (class Alt)
 import Control.Alternative (class Alternative)
+import Control.Monad.Error.Class (class MonadThrow)
 import Control.Plus (class Plus)
-import Data.Array.NonEmpty (NonEmptyArray, findLastIndex)
-import Data.Either.Nested (at2)
+import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Natural (Natural)
 import Data.String (CodePoint)
 
@@ -98,3 +98,20 @@ instance alternativeParser :: Alternative Parser
 instance plusParser :: Plus Parser where
   empty :: forall a. Parser a
   empty = Parser \tokens -> { result: Err "", remainder: tokens }
+
+instance bindParser :: Bind Parser where
+  bind :: forall a b. Parser a -> (a -> Parser b) -> Parser b
+  bind (Parser parsingFunctionA) f =
+    Parser \tokens ->
+      let
+        { remainder, result } = parsingFunctionA tokens
+      in
+        case result of
+          Err e -> { remainder, result: Err e }
+          Ok a -> let Parser parsingFunctionB = f a in parsingFunctionB tokens
+
+instance monadParser :: Monad Parser
+
+instance monadThrowParser :: MonadThrow String Parser where
+  throwError :: forall a. String -> Parser a
+  throwError message = Parser \remainder -> { remainder, result: Err message }

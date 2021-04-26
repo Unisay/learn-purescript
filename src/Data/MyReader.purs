@@ -1,8 +1,9 @@
 module Data.MyReader where
 
+import Data.Maybe (Maybe(..))
 import Prelude
+import Control.Monad.Maybe.Trans (MaybeT(..), lift, runMaybeT)
 import Data.Generic.Rep (class Generic)
-import Data.Maybe
 
 newtype MyReader r a
   = MyReader (r -> a)
@@ -20,6 +21,8 @@ instance applicativeMyReader :: Applicative (MyReader r) where
 
 instance bindMyReader :: Bind (MyReader r) where
   bind (MyReader ra) f = MyReader \r -> let MyReader rb = f (ra r) in rb r
+
+instance monadMyReader :: Monad (MyReader r)
 
 runMyReader :: forall r a. r -> MyReader r a -> a
 runMyReader r (MyReader f) = f r
@@ -52,17 +55,15 @@ pickGirls = ado
 makeFun :: MyReader Age (Beer -> Girls -> Fun)
 makeFun =
   ask
-    <#> \age beer girls -> if age > 23 then "Total Fun!" else "No Fun :("
+    <#> \age _beer _girls ->
+        if age > 23 then
+          "Total Fun!"
+        else
+          "No Fun :("
 
 makeSuperParty :: MyReader Age (Maybe Fun)
-makeSuperParty = do -- MyReader Age a
-  maybeBeer <- buyBeer
-  maybeGirls <- pickGirls
-  f <- makeFun
-  pure do -- Maybe a
-    beer <- maybeBeer
-    girls <- maybeGirls
-    pure (f beer girls)
-
-type MyReaderMaybe r a
-  = MyReader r (Maybe a)
+makeSuperParty =
+  runMaybeT
+    $ lift makeFun
+    <*> MaybeT buyBeer
+    <*> MaybeT pickGirls

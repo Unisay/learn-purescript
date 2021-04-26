@@ -2,8 +2,8 @@ module Composition where
 
 import Prelude
 import Data.Generic.Rep (class Generic)
+import Data.Maybe (Maybe(..))
 import Data.Show.Generic (genericShow)
-import Homework.Todo (todo)
 
 newtype Compose (f :: Type -> Type) (k :: Type -> Type) (a :: Type)
   = Compose (f (k a))
@@ -34,8 +34,44 @@ instance applicativeCompose ::
   pure :: forall a. a -> Compose f k a
   pure = Compose <<< pure <<< pure
 
-instance bindCompose :: (Monad f, Monad k) => Bind (Compose f k) where
-  bind :: forall a b. Compose f k a -> (a -> Compose f k b) -> Compose f k b
-  bind (Compose fka) acfkb = Compose $ fka >>= \ka -> pure (continue1 ka)
-    where
-    continue1 ka = ka <#> \a -> let Compose fkb = acfkb a in fkb
+instance bindCompose :: (Monad f) => Bind (Compose f Maybe) where
+  bind :: forall a b. Compose f Maybe a -> (a -> Compose f Maybe b) -> Compose f Maybe b
+  bind (Compose fma) acfmb =
+    Compose $ fma
+      >>= case _ of
+          Nothing -> pure Nothing
+          Just a -> unwrapCompose $ acfmb a
+
+unwrapCompose :: forall f k a. Compose f k a -> f (k a)
+unwrapCompose (Compose f) = f
+
+runMaybeT' :: forall f a. MaybeT f a -> f (Maybe a)
+runMaybeT' (MaybeT f) = f
+
+newtype MaybeT f a
+  = MaybeT (f (Maybe a))
+
+instance maybeTFunctor :: (Functor f) => Functor (MaybeT f) where
+  map f (MaybeT fma) = MaybeT (map (map f) fma)
+
+instance applyMaybeT :: (Apply f) => Apply (MaybeT f) where
+  apply (MaybeT fmab) (MaybeT fma) =
+    MaybeT ado
+      mab <- fmab
+      ma <- fma
+      in ado
+        ab <- mab
+        a <- ma
+        in ab a
+
+instance applicativeMaybeT :: (Applicative f) => Applicative (MaybeT f) where
+  pure = MaybeT <<< pure <<< pure
+
+instance bindMaybeT :: (Applicative f, Bind f) => Bind (MaybeT f) where
+  bind (MaybeT fma) acfmb =
+    MaybeT $ fma
+      >>= case _ of
+          Nothing -> pure Nothing
+          Just a -> runMaybeT' $ acfmb a
+
+instance monadMaybeT :: (Applicative f, Bind f) => Monad (MaybeT f)

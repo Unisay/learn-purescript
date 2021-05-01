@@ -27,6 +27,8 @@ pkgs.stdenv.mkDerivation {
     pursPkgs.purs
     pursPkgs.spago
     pursPkgs.zephyr
+    pkgs.dhall-lsp-server
+    pkgs.dhall
     pkgs.nodejs-14_x
     pkgs.nodePackages_latest.purty
     pkgs.nixpkgs-fmt

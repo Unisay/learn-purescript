@@ -8,6 +8,7 @@
   , "either"
   , "enums"
   , "foldable-traversable"
+  , "halogen"
   , "integers"
   , "lcg"
   , "maybe"

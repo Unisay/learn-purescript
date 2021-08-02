@@ -1,6 +1,8 @@
 { name = "learn-ps"
 , dependencies =
   [ "aff"
+  , "argonaut"
+  , "argonaut-core"
   , "arrays"
   , "console"
   , "control"
@@ -8,7 +10,7 @@
   , "either"
   , "enums"
   , "foldable-traversable"
-  , "halogen"
+  , "foreign-object"
   , "integers"
   , "lcg"
   , "maybe"

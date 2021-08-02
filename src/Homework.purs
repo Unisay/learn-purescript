@@ -42,7 +42,7 @@ gt5 x = x >= 5
 i2s :: Int -> String
 i2s = case _ of
   42 -> "cool"
-  otherwise -> "not cool"
+  _ -> "not cool"
 
 c2s :: Char -> String
 c2s = codePointFromChar >>> String.singleton

@@ -12,7 +12,6 @@ import Data.Natural (Natural)
 import Data.Semigroup.Foldable (class Foldable1, foldr1)
 import Data.String (codePointFromChar)
 import Data.String.CodePoints as String
-import Homework.Todo (todo)
 
 type Nickname
   = String

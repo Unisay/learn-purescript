@@ -18,6 +18,7 @@
   , "newtype"
   , "node-readline"
   , "node-streams"
+  , "ordered-collections"
   , "partial"
   , "prelude"
   , "psci-support"

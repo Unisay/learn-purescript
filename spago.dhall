@@ -2,6 +2,7 @@
 , dependencies =
   [ "aff"
   , "argonaut"
+  , "argonaut-codecs"
   , "argonaut-core"
   , "arrays"
   , "console"
@@ -28,6 +29,7 @@
   , "tuples"
   , "unfoldable"
   , "unicode"
+  , "unordered-collections"
   , "unsafe-coerce"
   ]
 , packages = ./packages.dhall

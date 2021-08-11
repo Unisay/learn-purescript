@@ -1,10 +1,13 @@
 module JSON where
 
 import Prelude
+
 import Control.Alt ((<|>))
-import Data.Argonaut (class DecodeJson, class EncodeJson, Json, JsonDecodeError(..), encodeJson, decodeJson, jsonEmptyObject)
+import Data.Argonaut (class DecodeJson, class EncodeJson, Json, JsonDecodeError(..), decodeJson, encodeJson, jsonEmptyObject, jsonEmptyString, (.!=), (.:), (.:?))
 import Data.Argonaut as A
+import Data.Argonaut.Decode.Decoders (decodeString)
 import Data.Argonaut.Encode.Combinators ((:=), (~>))
+import Data.Argonaut.Encode.Encoders (encodeString)
 import Data.Argonaut.Parser (jsonParser)
 import Data.Array as Array
 import Data.Either (Either(..), either)
@@ -173,11 +176,49 @@ wingChun =
     , master: Just "Ip Man"
     }
 
+
+instance encodeJsonDrill :: EncodeJson Drill where
+  encodeJson :: Drill -> Json
+  encodeJson = case _ of
+    PushingHands ->
+      encodeString "PushingHands"
+    Sparring ->
+      encodeString "Sparring"
+
+decodePushingHands :: Json -> Either JsonDecodeError Drill
+decodePushingHands json = do
+  value :: String  <- decodeString json
+  case value of
+    "PushingHands" -> Right PushingHands
+    _ -> Left (UnexpectedValue json)
+
+decodeSparring :: Json -> Either JsonDecodeError Drill
+decodeSparring json = do
+  value :: String  <- decodeString json
+  case value of
+    "Sparring" -> Right Sparring
+    _ -> Left (UnexpectedValue json)
+
+instance decodeJsonDrill :: DecodeJson Drill where
+  decodeJson json = decodePushingHands json <|> decodeSparring json
+
 instance encodeJsonKungfu :: EncodeJson Kungfu where
-  encodeJson = notImplemented
+  encodeJson (Kungfu obj) =
+    "chineseName" := obj.chineseName
+    ~> "qiPowerScore" := obj.qiPowerScore
+    ~> "drills" := obj.drills
+    ~> "master" := obj.master
+    ~> jsonEmptyObject
+
 
 instance decodeJsonKungfu :: DecodeJson Kungfu where
-  decodeJson = notImplemented
+  decodeJson json = do
+    obj <- decodeJson json
+    chineseName <- obj .: "chineseName"
+    qiPowerScore <- obj .: "qiPowerScore"
+    drills <- obj .: "drills"
+    master <- obj .:? "master"
+    pure $ Kungfu { chineseName: chineseName, qiPowerScore: qiPowerScore, drills: drills, master: master}
 
 decodeKungfu :: Json -> Either JsonDecodeError Kungfu
 decodeKungfu = decodeJson

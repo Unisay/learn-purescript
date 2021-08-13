@@ -30,7 +30,7 @@
   },
   "homepage": "https://github.com/Unisay/learn-purescript#readme",
   "devDependencies": {
-    "http-server": "^0.12.3",
+    "http-server": "^13.0.0",
     "purescript": "^0.14.1",
     "purty": "^7.0.0",
     "spago": "^0.19.2"

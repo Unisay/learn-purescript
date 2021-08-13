@@ -192,8 +192,8 @@ foreign import db :: Json
 
 foreign import db_view :: Json
 
-homework_is_done_no_cheating :: Boolean
-homework_is_done_no_cheating = db_view == view db
+homework_is_done_no_cheating :: Either JsonDecodeError Boolean
+homework_is_done_no_cheating = eq db_view <$> view db
 
-view :: Json -> Json
+view :: Json -> Either JsonDecodeError Json
 view = notImplemented

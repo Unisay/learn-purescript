@@ -2,9 +2,10 @@ module JSON where
 
 import Prelude
 import Control.Alt ((<|>))
-import Data.Argonaut (class DecodeJson, class EncodeJson, Json, JsonDecodeError(..), encodeJson, decodeJson, jsonEmptyObject)
+import Data.Argonaut (class DecodeJson, class EncodeJson, Json, JsonDecodeError(..), decodeJson, encodeJson, jsonEmptyObject)
 import Data.Argonaut as A
-import Data.Argonaut.Encode.Combinators ((:=), (~>))
+import Data.Argonaut.Decode.Combinators ((.:), (.:?))
+import Data.Argonaut.Encode.Combinators ((:=), (:=?), (~>), (~>?))
 import Data.Argonaut.Parser (jsonParser)
 import Data.Array as Array
 import Data.Either (Either(..), either)
@@ -16,7 +17,6 @@ import Effect (Effect)
 import Effect.Class.Console (log)
 import Foreign.Object (Object)
 import Foreign.Object as Object
-import Helper (notImplemented)
 
 foreign import sampleJson1 :: Json
 
@@ -151,10 +151,10 @@ derive instance eqDrill :: Eq Drill
 
 derive instance ordDrill :: Ord Drill
 
-instance showDrill :: Show Drill where
-  show = case _ of
-    PushingHands -> "Pushing Hands"
-    Sparring -> "Sparring"
+showDrill :: Drill -> String
+showDrill = case _ of
+  PushingHands -> "Pushing Hands"
+  Sparring -> "Sparring"
 
 data Kungfu
   = Kungfu
@@ -173,11 +173,34 @@ wingChun =
     , master: Just "Ip Man"
     }
 
+instance decodeJsonDrill :: DecodeJson Drill where
+  decodeJson :: Json -> Either JsonDecodeError Drill
+  decodeJson json = do
+    { drills } :: { drills :: String } <- decodeJson json
+    case drills of
+      "pushinghands" -> Right PushingHands
+      "sparring" -> Right Sparring
+      _ -> Left (UnexpectedValue json)
+
+instance encodeDrill :: EncodeJson Drill where
+  encodeJson :: Drill -> Json
+  encodeJson d =
+    encodeJson
+      { drills:
+          case d of
+            PushingHands -> "pushinghands"
+            Sparring -> "sparring"
+      }
+
 instance encodeJsonKungfu :: EncodeJson Kungfu where
-  encodeJson = notImplemented
+  encodeJson :: Kungfu -> Json
+  encodeJson (Kungfu r) = encodeJson r
 
 instance decodeJsonKungfu :: DecodeJson Kungfu where
-  decodeJson = notImplemented
+  decodeJson :: Json -> Either JsonDecodeError Kungfu
+  decodeJson json = do
+    x <- decodeJson json
+    pure $ Kungfu x
 
 decodeKungfu :: Json -> Either JsonDecodeError Kungfu
 decodeKungfu = decodeJson
@@ -188,12 +211,12 @@ roundtripKungfu =
     >>> decodeKungfu
     >>> either (const false) (const true)
 
-foreign import db :: Json
+-- Homework: make `roundtripKungfu wingChun` return true!
+decodeDrill :: Json -> Either JsonDecodeError Drill
+decodeDrill = decodeJson
 
-foreign import db_view :: Json
-
-homework_is_done_no_cheating :: Either JsonDecodeError Boolean
-homework_is_done_no_cheating = eq db_view <$> view db
-
-view :: Json -> Either JsonDecodeError Json
-view = notImplemented
+roundtripDrill :: Drill -> Boolean
+roundtripDrill =
+  encodeJson
+    >>> decodeDrill
+    >>> either (const false) (const true)

@@ -75,3 +75,54 @@ true
 
 -}
 
+derive instance Generic (Shallow a) _
+
+instance Show a => Show (Shallow a) where 
+  show = genericShow
+
+instance HasDepth Void where depth _ = 0
+
+instance HasDepth Unit where depth _ = 1
+
+instance HasDepth Int where depth _ = 1
+
+instance HasDepth String where depth _ = 1
+
+instance HasDepth Boolean where depth _ = 1
+
+instance HasDepth a => HasDepth (Maybe a) where 
+  depth = maybe 0 (depth >>> (_ + 1))
+
+instance (HasDepth a, HasDepth b) => HasDepth (Either a b) where 
+  depth = either step step 
+    where 
+      step :: forall x. HasDepth x => x -> Int
+      step = depth >>> (_ + 1)
+
+instance (HasDepth a, HasDepth b) => HasDepth (Tuple a b) where 
+  depth (Tuple a b) = max (depth a) (depth b)
+
+instance HasDepth a => HasDepth (Array a) where 
+  depth = fromMaybe 0 <<< maximum <<< map depth
+  
+instance HasDepth a => HasDepth (Shallow a) where 
+  depth = genericDepth
+
+instance (HasDepth a, HasDepth b) => HasDepth (Product a b) where 
+  depth (Product a b) = max (depth a) (depth b)
+  
+instance (HasDepth a, HasDepth b) => HasDepth (Sum a b) where 
+  depth (Inl a) = depth a
+  depth (Inr b) = depth b
+
+instance HasDepth NoArguments where 
+  depth _ = 0
+
+instance HasDepth a => HasDepth (Argument a) where 
+  depth (Argument a) = 1 + depth a
+
+instance HasDepth t => HasDepth (Constructor s t) 
+   where depth (Constructor t) = depth t
+
+genericDepth :: forall t rep. Generic t rep => HasDepth rep => t -> Int
+genericDepth = depth <<< from 

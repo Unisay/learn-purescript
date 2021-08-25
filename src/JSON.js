@@ -30,19 +30,6 @@ exports.db = {
     ["Vlad", 16, false],
   ],
 };
-exports.db_view = {
-  columns: [
-    { name: "name", type: "String", required: true },
-    { name: "age", type: "Number", required: true },
-    { name: "has_kids", type: "Bool", required: false, default: false },
-  ],
-  rows: [
-    ["Yura", 39, true],
-    ["Chiki", 40, true],
-    ["Vadym", 16],
-    ["Vlad", 16, false],
-  ],
-};
 
 exports.db_view = [
   'name="Yura", age=39, has_kids=true',

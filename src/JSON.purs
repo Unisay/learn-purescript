@@ -1,22 +1,25 @@
 module JSON where
 
 import Prelude
+
 import Control.Alt ((<|>))
-import Data.Argonaut (class DecodeJson, class EncodeJson, Json, JsonDecodeError(..), decodeJson, encodeJson, jsonEmptyObject)
+import Data.Argonaut (class DecodeJson, class EncodeJson, Json, JsonDecodeError(..), decodeJson, encodeJson, jsonEmptyObject, stringify)
 import Data.Argonaut as A
 import Data.Argonaut.Decode.Combinators ((.:), (.:?))
 import Data.Argonaut.Encode.Combinators ((:=), (:=?), (~>), (~>?))
 import Data.Argonaut.Parser (jsonParser)
 import Data.Array as Array
 import Data.Either (Either(..), either)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.Set (Set)
 import Data.Set as Set
+import Data.String as Str
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Class.Console (log)
 import Foreign.Object (Object)
 import Foreign.Object as Object
+import Helper (notImplemented)
 
 foreign import sampleJson1 :: Json
 
@@ -215,8 +218,60 @@ roundtripKungfu =
 decodeDrill :: Json -> Either JsonDecodeError Drill
 decodeDrill = decodeJson
 
-roundtripDrill :: Drill -> Boolean
-roundtripDrill =
-  encodeJson
-    >>> decodeDrill
-    >>> either (const false) (const true)
+view :: Json -> Either JsonDecodeError Json
+view json = do
+  database <- decodeDatabase json
+  Right ((encodeView <<< viewDb) database)
+
+type Db
+  = { columns :: Array ColumnInfo
+    , rows :: Array DbRow
+    }
+
+type View
+  = Array String
+
+type DbRow
+  = Array Json
+
+type ViewRow
+  = String
+
+type ColumnInfo
+  = { name :: String }
+
+viewDb :: Db -> View
+viewDb { columns, rows } = viewRow <$> rows
+  where
+  viewRow :: Array Json -> String
+  viewRow cells = Str.joinWith ", " (Array.mapWithIndex viewCell cells)
+
+  viewCell :: Int -> Json -> String
+  viewCell idx cell = maybe "" _.name columnInfo <> "=" <> stringify cell
+    where
+    columnInfo :: Maybe { name :: String }
+    columnInfo = Array.index columns idx
+
+    
+
+encodeView :: View -> Json
+encodeView = encodeJson
+
+decodeDatabase :: Json -> Either JsonDecodeError Db
+decodeDatabase = decodeJson
+
+renderDatabase :: Db -> String
+renderDatabase { columns, rows } =
+  show
+    { columns:
+        map show columns
+    , rows: map (map stringify) rows 
+    }
+    
+foreign import db :: Json
+
+foreign import db_view :: Json
+
+homework_is_done_no_cheating :: Either JsonDecodeError Boolean
+homework_is_done_no_cheating = eq db_view <$> view db
+

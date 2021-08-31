@@ -1,22 +1,20 @@
 module Homework.Generics where
 
 import Prelude
-
-import Data.Array (zipWith)
-import Data.Either (Either(..), either)
-import Data.Foldable (maximum)
-import Data.Generic.Rep (class Generic, Argument(..), Constructor(..), NoArguments, Product(..), Sum(..), from)
-import Data.Maybe (Maybe(..), fromMaybe, maybe)
-import Data.Show.Generic (genericShow)
-import Data.Tuple (Tuple(..))
+import Data.Maybe (Maybe)
 
 class HasDepth a where
   depth :: a -> Int
 
-data Shallow a = Shallow | Deeper a | Deep (Maybe a)
+data Shallow a
+  = Shallow
+  | Deeper a
+  | Deep (Maybe a)
 
 shallowThing :: Shallow Unit
 shallowThing = Shallow
+
+{-
 
 tests :: Array Boolean
 tests = 
@@ -32,8 +30,6 @@ tests =
     , depth (Just [Left "Error", Right (Tuple (Deep (Just "yes")) 42)]) 
     ]
     [ 0 , 1 , 2 , 1 , 3 , 1 , 2 , 2 , 5 ]
-
-{-
 
 The task is to implement depth:
 
@@ -79,4 +75,3 @@ such that it works for any type (example in REPL):
 true
 
 -}
-

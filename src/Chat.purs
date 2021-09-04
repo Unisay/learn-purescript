@@ -4,11 +4,13 @@ import Prelude
 import Applicative.Parsing.Parser.Standard (keyword, naturalParser, singleParser)
 import Applicative.Parsing.Types (Parser(..), ParsingFunction, Result(..), Token(..))
 import Control.Alt ((<|>))
+import Control.Monad.Error.Class (throwError)
 import Data.Array (uncons)
 import Data.Array.NonEmpty as NE
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Maybe (Maybe(..), maybe, optional)
 import Data.Natural (Natural)
+import Data.Semigroup.Foldable (class Foldable1, foldr1)
 import Data.String (codePointFromChar)
 import Data.String.CodePoints as String
 
@@ -129,26 +131,12 @@ nicknameParser = Parser parsingFunction
       }
 
 ageParser :: Parser Natural1
-ageParser =
-  Parser \newTokens ->
-    let
-      Parser originalParsingFunction = naturalParser
-
-      originalRecord = originalParsingFunction newTokens
-    in
-      { remainder: originalRecord.remainder
-      , result:
-          nat0ToResNat1 originalRecord.result
-      }
-  where
-  nat0ToResNat1 :: Result Natural0 -> Result Natural1
-  nat0ToResNat1 = case _ of
-    Err e -> Err e
-    Ok x ->
-      if x == zero then
-        Err "Expected non-zero nat"
-      else
-        Ok $ Natural1 x
+ageParser = do
+  nat0 <- naturalParser
+  if nat0 == zero then
+    throwError "Expected non-zero nat"
+  else
+    pure $ Natural1 nat0
 
 sexParser :: Parser Sex
 sexParser =
@@ -169,3 +157,7 @@ sexParser =
               cp -> Err $ "Expected 'M' | 'F' but got " <> show cp
             Err error -> Err error
       }
+
+-- sequence [keyword "A" $> 1, keyword "B" $> 42, keyword "C" $> 119] `parseStr` "A B C" OK: [1,42,119]
+-- sequence :: forall a. Array (Parser a) -> Parser (Array a)
+-- sequence = todo "pls implement"

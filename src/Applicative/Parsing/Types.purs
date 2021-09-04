@@ -2,6 +2,8 @@ module Applicative.Parsing.Types where
 
 import Prelude
 import Control.Alt (class Alt)
+import Control.Alternative (class Alternative)
+import Control.Monad.Error.Class (class MonadThrow)
 import Control.Plus (class Plus)
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Natural (Natural)
@@ -27,6 +29,14 @@ type ParsingFunction r
 data Result a
   = Ok a
   | Err String
+
+instance eqResult :: Eq a => Eq (Result a) where
+  eq :: Result a -> Result a -> Boolean
+  eq = case _, _ of
+    Ok a1, Ok a2 -> a1 == a2
+    Ok _, Err _ -> false
+    Err _, Ok _ -> false
+    Err e1, Err e2 -> e1 == e2
 
 instance functorResult :: Functor Result where
   map f = case _ of
@@ -70,7 +80,7 @@ instance applyParser :: Apply Parser where
 
 instance applicativeParser :: Applicative Parser where
   pure :: forall a. a -> Parser a
-  pure x = Parser \neat -> { remainder: neat, result: Ok x }
+  pure x = Parser \remainder -> { result: Ok x, remainder }
 
 instance parserAlt :: Alt Parser where
   alt :: forall a. Parser a -> Parser a -> Parser a
@@ -83,6 +93,25 @@ instance parserAlt :: Alt Parser where
           Ok _ -> pfr1
           Err _ -> pf2 tokens
 
+instance alternativeParser :: Alternative Parser
+
 instance plusParser :: Plus Parser where
   empty :: forall a. Parser a
   empty = Parser \tokens -> { result: Err "", remainder: tokens }
+
+instance bindParser :: Bind Parser where
+  bind :: forall a b. Parser a -> (a -> Parser b) -> Parser b
+  bind (Parser parsingFunctionA) f =
+    Parser \tokens ->
+      let
+        { remainder, result } = parsingFunctionA tokens
+      in
+        case result of
+          Err e -> { remainder, result: Err e }
+          Ok a -> let Parser parsingFunctionB = f a in parsingFunctionB tokens
+
+instance monadParser :: Monad Parser
+
+instance monadThrowParser :: MonadThrow String Parser where
+  throwError :: forall a. String -> Parser a
+  throwError message = Parser \remainder -> { remainder, result: Err message }

@@ -44,15 +44,22 @@ keyword :: String -> Parser Unit
 keyword expected =
   Parser \tokens ->
     let
+      expecting = "expecting keyword " <> show expected
+
       err msg = { remainder: tokens, result: Err msg }
     in
       case uncons tokens of
         Just { head: Lexeme neac, tail } ->
-          let
-            ok cmd = { result: Ok cmd, remainder: tail }
-          in
-            case String.fromCodePointArray (NE.toArray neac) of
-              s
-                | s == expected -> ok unit
-              _ -> err $ "Unexpected string, expecting keyword"
-        _ -> err $ "Unexpected string, expecting keyword"
+          if String.fromCodePointArray (NE.toArray neac) == expected then
+            { result: Ok unit, remainder: tail }
+          else
+            err $ "Unexpected lexeme, " <> expecting
+        Just { head: Single c, tail } ->
+          if String.fromCodePointArray [ c ] == expected then
+            { result: Ok unit, remainder: tail }
+          else
+            err $ "Unexpected code point, " <> expecting
+        _ -> err $ "Unexpected string, " <> expecting
+
+success :: Parser Unit
+success = pure unit

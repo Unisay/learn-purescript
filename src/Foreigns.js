@@ -1,3 +1,3 @@
 "use strict";
 
-exports.test = { foo: "foo", bar: 42, baz: true };
+exports.point = [42, 43];

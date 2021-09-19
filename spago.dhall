@@ -11,6 +11,7 @@
   , "either"
   , "enums"
   , "foldable-traversable"
+  , "foreign"
   , "foreign-object"
   , "integers"
   , "lcg"

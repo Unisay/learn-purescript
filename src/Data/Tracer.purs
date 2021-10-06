@@ -2,9 +2,14 @@ module Data.Tracer where
 
 import Prelude
 
+import Data.Array (foldl)
+import Data.Foldable (traverse_)
 import Data.Generic.Rep (class Generic)
+import Data.Maybe (Maybe(..), maybe)
 import Data.Show.Generic (genericShow)
 import Data.String (joinWith)
+import Effect (Effect)
+import Effect.Console (log)
 import Homework.Todo (todo')
 
 data Tracer a = Tracer (Array Tr) a
@@ -56,20 +61,66 @@ runTracerLog (Tracer trs _a) = trs
 renderTracer :: forall a. Tracer a -> String
 renderTracer = joinWith "\n" <<< map show <<< runTracerLog
 
+logTracer :: forall a. Show a => Tracer a -> Effect Unit
+logTracer t = traverse_ log (foldl next Nothing (runTracerLog t))
+  where
+  next :: Maybe String -> Tr -> Maybe String
+  next acc = case _ of
+    Tr msg -> Just $ maybe msg (\s -> s <> "\n" <> msg) acc
+    Clear -> Nothing
+
 --------------------------------------------------------------------------------
+
+{-
+
+> runTracerLog hapax
+[(Tr "I am Hapax! [42]")]
+
+> logTracer hapax
+I am Hapax! [42]
+
+> spadoinkle 
+(Tr "I am Spadoinkle! [11]")
+
+> logTracer spadoinkle 
+I am Spadoinkle! [11]
+
+> hadoinkel 
+(Tr "I am Hapax! [42]")
+(Tr "I am Spadoinkle! [11]")
+(Tr "Hapax joins Spadoinkle. Hadoinkel [53] emerges!")
+
+> logTracer hadoinkel    
+I am Hapax! [42]
+I am Spadoinkle! [11]
+Hapax joins Spadoinkle. Hadoinkel [53] emerges!
+
+> legomenon 
+(Tr "I am Hapax! [42]")
+(Tr "I am Spadoinkle! [11]")
+(Tr "Hapax joins Spadoinkle. Hadoinkel [53] emerges!")
+Clear
+(Tr "Legomenon kills Hadoinkel and takes its assets!")
+(Tr "I am Legomenon! [53]")
+
+> logTracer legomenon 
+Legomenon kills Hadoinkel and takes its assets!
+I am Legomenon! [53]
+-}
 
 hadoinkel :: Tracer Int
 hadoinkel = do
   h <- hapax
   s <- spadoinkle
-  trace "Hapax Joins Spadoinkle. Hadoinkel emerges!"
-  pure (h + s)
+  let hs = h + s
+  trace $ "Hapax joins Spadoinkle. Hadoinkel [" <> show hs <> "] emerges!"
+  pure hs
 
 legomenon :: Tracer Int
 legomenon = do
+  h <- hadoinkel
   clear
   trace "Legomenon kills Hadoinkel and takes its assets!"
-  h <- hadoinkel
   trace $ "I am Legomenon! [" <> show h <> "]"
   pure h
 
@@ -78,3 +129,4 @@ hapax = trace "I am Hapax! [42]" $> 42
 
 spadoinkle :: Tracer Int
 spadoinkle = trace "I am Spadoinkle! [11]" *> pure 11
+

@@ -28,15 +28,24 @@ instance bindTracer :: Bind Tracer where
 
 -- instance semigroupTracer :: Semigroup (Tracer a)
 
-data Tr = Begin | Action String | End | Clear
+data Tr = Tr String | Clear
 
 derive instance genericTr :: Generic Tr _
 
 instance showTr :: Show Tr where
   show = genericShow
 
-tr :: Tr -> Tracer Unit
-tr t = Tracer [ t ] unit
+tr :: forall a. Tr -> a -> Tracer a
+tr t a = Tracer [ t ] a
+
+tr_ :: Tr -> Tracer Unit
+tr_ t = tr t unit
+
+trace :: String -> Tracer Unit
+trace = tr_ <<< Tr
+
+clear :: Tracer Unit
+clear = tr_ Clear
 
 runTracerResult :: forall a. Tracer a -> a
 runTracerResult (Tracer _trs a) = a
@@ -47,3 +56,25 @@ runTracerLog (Tracer trs _a) = trs
 renderTracer :: forall a. Tracer a -> String
 renderTracer = joinWith "\n" <<< map show <<< runTracerLog
 
+--------------------------------------------------------------------------------
+
+hadoinkel :: Tracer Int
+hadoinkel = do
+  h <- hapax
+  s <- spadoinkle
+  trace "Hapax Joins Spadoinkle. Hadoinkel emerges!"
+  pure (h + s)
+
+legomenon :: Tracer Int
+legomenon = do
+  clear
+  trace "Legomenon kills Hadoinkel and takes its assets!"
+  h <- hadoinkel
+  trace $ "I am Legomenon! [" <> show h <> "]"
+  pure h
+
+hapax :: Tracer Int
+hapax = trace "I am Hapax! [42]" $> 42
+
+spadoinkle :: Tracer Int
+spadoinkle = trace "I am Spadoinkle! [11]" *> pure 11

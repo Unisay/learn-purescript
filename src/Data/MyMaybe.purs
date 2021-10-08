@@ -4,10 +4,7 @@ import Prelude
 import Data.Eq.Generic (genericEq)
 import Data.Foldable (class Foldable)
 import Data.Generic.Rep (class Generic)
-import Data.Maybe (Maybe(..))
 import Data.Show.Generic (genericShow)
-import Node.Stream (onFinish)
-
 data MyMaybe a
   = None
   | Some a

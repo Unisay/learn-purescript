@@ -10,18 +10,19 @@ import Data.Show.Generic (genericShow)
 import Data.String (joinWith)
 import Effect (Effect)
 import Effect.Console (log)
-import Homework.Todo (todo')
 
 data Tracer a = Tracer (Array Tr) a
 
-instance showTracer :: Show (Tracer a) where
-  show = renderTracer
+derive instance genericTracer :: Generic (Tracer a) _
+
+instance showTracer :: Show a => Show (Tracer a) where
+  show = genericShow
 
 derive instance functorTracer :: Functor Tracer
 
 instance applyTracer :: Apply Tracer where
   apply :: forall a b. Tracer (a -> b) -> Tracer a -> Tracer b
-  apply = todo' "Implement"
+  apply (Tracer ft f) (Tracer at a) = Tracer (ft <> at) (f a)
 
 instance applicativeTracer :: Applicative Tracer where
   pure :: forall a. a -> Tracer a
@@ -29,9 +30,7 @@ instance applicativeTracer :: Applicative Tracer where
 
 instance bindTracer :: Bind Tracer where
   bind :: forall a b. Tracer a -> (a -> Tracer b) -> Tracer b
-  bind = todo' "Implement"
-
--- instance semigroupTracer :: Semigroup (Tracer a)
+  bind (Tracer at a) f = case f a of Tracer bt b -> Tracer (at <> bt) b
 
 data Tr = Tr String | Clear
 
@@ -118,15 +117,18 @@ hadoinkel = do
 
 legomenon :: Tracer Int
 legomenon = do
-  h <- hadoinkel
-  clear
-  trace "Legomenon kills Hadoinkel and takes its assets!"
-  trace $ "I am Legomenon! [" <> show h <> "]"
-  pure h
+  power <- hadoinkel
+  if power < 10 then do
+    clear
+    trace "Legomenon kills Hadoinkel and takes its power!"
+    trace $ "I am Legomenon! [" <> show power <> "]"
+    pure power
+  else
+    trace "Legomenon dies because Hadoinkel is too strong!" $> power
 
 hapax :: Tracer Int
-hapax = trace "I am Hapax! [42]" $> 42
+hapax = trace "I am Hapax!" $> 4
 
 spadoinkle :: Tracer Int
-spadoinkle = trace "I am Spadoinkle! [11]" *> pure 11
+spadoinkle = trace "I am Spadoinkle!" *> pure 1
 

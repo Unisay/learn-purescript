@@ -10,3 +10,4 @@
 /.spago
 *.code-workspace
 /.direnv/
+.envrc

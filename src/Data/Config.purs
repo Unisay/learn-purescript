@@ -19,3 +19,7 @@ instance semigroupConfig :: Semigroup a => Semigroup (Config r a) where
 instance applyConfig :: Apply (Config r) where
   apply :: forall r a b. Config r (a -> b) -> Config r a -> Config r b
   apply (Config rab) (Config ra) = Config \r -> rab r (ra r)
+
+instance bindConfig :: Bind (Config r) where
+  bind :: forall r a b. Config r a -> (a -> Config r b) -> Config r b
+  bind (Config ra) f = Config \r -> runConfig (f (ra r)) r

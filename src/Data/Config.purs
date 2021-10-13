@@ -28,3 +28,29 @@ instance applicativeConfig :: Applicative (Config r) where
 instance bindConfig :: Bind (Config r) where
   bind :: forall r a b. Config r a -> (a -> Config r b) -> Config r b
   bind (Config ra) f = Config \r -> runConfig (f (ra r)) r
+
+--------------------------------------------------------------------------------
+
+data Verbosity = Loud | Quiet
+
+instance showVerbosity :: Show Verbosity where
+  show = case _ of
+    Loud -> "Loud"
+    Quiet -> "Quiet"
+
+greeting :: Config Verbosity String
+greeting = Config $ case _ of
+  Loud -> "HELLO!"
+  Quiet -> "hi"
+
+currentVerbosity :: Config Verbosity Verbosity
+currentVerbosity = Config identity
+
+configurableProgram :: Config Verbosity String
+configurableProgram = do
+  gr <- greeting
+  currentVerbosity <#> \cv ->
+    gr <> "\n" <> case cv of
+      Loud -> "I am very loud!"
+      Quiet -> "I live my quiet life"
+

@@ -8,6 +8,7 @@
 /.purs*
 /.psa*
 /.spago
+/.vscode/
 *.code-workspace
 /.direnv/
 .envrc

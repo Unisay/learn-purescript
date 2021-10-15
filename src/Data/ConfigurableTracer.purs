@@ -2,24 +2,14 @@ module ConfigurableTracer where
 
 import Prelude
 
+import Control.Apply (lift2)
 import Data.Array as Array
-import Data.Config (Config(..), runConfig)
-import Data.Tracer (Tr(..), Tracer, clear, renderTracer, tr, tr_)
-import Homework.Todo (todo')
+import Data.Config (Config(..))
+import Data.Identity (Identity)
+import Data.Newtype (class Newtype, wrap, unwrap, over)
+import Data.Tracer (Tr(..), TracerT(..), clear, tr, tr_)
 
-newtype TinC r a = TinC (Config r (Tracer a))
-
-instance functorTinC :: Functor (TinC r) where
-  map = todo' "Implement"
-
-instance applyTinC :: Apply (TinC r) where
-  apply = todo' "Implement"
-
-instance applicativeTinC :: Applicative (TinC r) where
-  pure = todo' "Implement"
-
-instance bindTinC :: Bind (TinC r) where
-  bind = todo' "Implement"
+type TinC r = TracerT (Config r)
 
 tracerInConfig :: Config { n :: Int } (Tracer Int)
 tracerInConfig = Config \{ n } -> do
@@ -32,15 +22,12 @@ tracerInConfigC x = Config \{ n } ->
   tr_ (Tr ("Configured Tracer: " <> show (n + x)))
 
 composedTracersInConfigA :: TinC { n :: Int } Unit
-composedTracersInConfigA = TinC tracerInConfig *> TinC (tracerInConfigC 3)
+composedTracersInConfigA = wrap tracerInConfig *> wrap (tracerInConfigC 3)
 
 composedTracersInConfigB :: TinC { n :: Int } Unit
 composedTracersInConfigB = do
-  n <- TinC tracerInConfig
-  TinC $ tracerInConfigC n
-
-runTracerInConfig :: forall r a. Config r (Tracer a) -> r -> String
-runTracerInConfig c = renderTracer <<< runConfig c
+  n <- wrap tracerInConfig
+  wrap $ tracerInConfigC n
 
 configInTracer :: Tracer (Config { n :: Int } Unit)
 configInTracer = tr (Tr "Traced Config") (Config \_configIgnored -> unit)

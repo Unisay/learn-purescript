@@ -2,35 +2,61 @@ module Data.Tracer where
 
 import Prelude
 
+import Applicative (lift2)
+import Class.MyNewtype (over, unwrap, wrap)
 import Data.Array (foldl)
 import Data.Foldable (traverse_)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), maybe)
+import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
 import Data.String (joinWith)
+import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
 
-data Tracer a = Tracer (Array Tr) a
+newtype TracerT m a = TracerT (m (Tuple (Array Tr) a))
 
-derive instance genericTracer :: Generic (Tracer a) _
+type Ident a = a
 
-instance showTracer :: Show a => Show (Tracer a) where
-  show = genericShow
+type Tracer = TracerT Ident
 
-derive instance functorTracer :: Functor Tracer
+derive instance newtypeTracerT :: Newtype (TracerT m a) _
 
-instance applyTracer :: Apply Tracer where
-  apply :: forall a b. Tracer (a -> b) -> Tracer a -> Tracer b
-  apply (Tracer ft f) (Tracer at a) = Tracer (ft <> at) (f a)
+instance functorTracerT :: Functor m => Functor (TracerT m) where
+  map = over TracerT <<< map <<< map
 
-instance applicativeTracer :: Applicative Tracer where
-  pure :: forall a. a -> Tracer a
-  pure = Tracer []
+instance applyTinC :: Apply m => Apply (TracerT m) where
+  apply f a = wrap (lift2 apply (unwrap f) (unwrap a))
 
-instance bindTracer :: Bind Tracer where
-  bind :: forall a b. Tracer a -> (a -> Tracer b) -> Tracer b
-  bind (Tracer at a) f = case f a of Tracer bt b -> Tracer (at <> bt) b
+instance applicativeTinC :: Applicative m => Applicative (TracerT m) where
+  pure = wrap <<< pure <<< pure
+
+instance bindTinC :: Monad m => Bind (TracerT m) where
+  bind t f =
+    wrap do
+      TracerT (Tuple trsl a) <- unwrap t
+      TracerT (Tuple trsr b) <- unwrap $ f a
+      pure $ Tracer (trsl <> trsr)
+
+-- derive instance genericTracer :: Generic (Tracer a) _
+
+-- instance showTracer :: Show a => Show (Tracer a) where
+--   show = genericShow
+
+-- derive instance functorTracer :: Functor Tracer
+
+-- instance applyTracer :: Apply Tracer where
+--   apply :: forall a b. Tracer (a -> b) -> Tracer a -> Tracer b
+--   apply (TracerT (Tuple ft f)) (Tracer at a) = Tracer (ft <> at) (f a)
+
+-- instance applicativeTracer :: Applicative Tracer where
+--   pure :: forall a. a -> Tracer a
+--   pure = Tracer []
+
+-- instance bindTracer :: Bind Tracer where
+--   bind :: forall a b. Tracer a -> (a -> Tracer b) -> Tracer b
+--   bind (Tracer at a) f = case f a of Tracer bt b -> Tracer (at <> bt) b
 
 data Tr = Tr String | Clear
 

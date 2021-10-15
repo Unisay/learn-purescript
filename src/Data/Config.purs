@@ -29,6 +29,8 @@ instance bindConfig :: Bind (Config r) where
   bind :: forall r a b. Config r a -> (a -> Config r b) -> Config r b
   bind (Config ra) f = Config \r -> runConfig (f (ra r)) r
 
+instance monadConfig :: Monad (Config r)
+
 --------------------------------------------------------------------------------
 
 data Verbosity = Loud | Quiet

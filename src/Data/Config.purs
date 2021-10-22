@@ -14,6 +14,9 @@ instance functorConfig :: Functor (Config r) where
 runConfig :: forall r a. Config r a -> r -> a
 runConfig = unwrap
 
+config :: forall r. Config r r
+config = Config identity
+
 instance semigroupConfig :: Semigroup a => Semigroup (Config r a) where
   append (Config ral) (Config rar) = Config \r -> ral r <> rar r
 

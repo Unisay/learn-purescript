@@ -2,61 +2,51 @@ module Data.Tracer where
 
 import Prelude
 
-import Applicative (lift2)
-import Class.MyNewtype (over, unwrap, wrap)
+import Data.Newtype (class Newtype, over, unwrap, wrap)
+import Control.Apply (lift2)
 import Data.Array (foldl)
 import Data.Foldable (traverse_)
 import Data.Generic.Rep (class Generic)
+import Data.Identity (Identity)
 import Data.Maybe (Maybe(..), maybe)
-import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
 import Data.String (joinWith)
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(..), fst, snd)
 import Effect (Effect)
 import Effect.Console (log)
 
-newtype TracerT m a = TracerT (m (Tuple (Array Tr) a))
+newtype TracerT (m :: Type -> Type) a = TracerT (m (Tuple (Array Tr) a))
 
-type Ident a = a
+liftTracerT :: forall m a. Functor m => m a -> TracerT m a
+liftTracerT ma = TracerT $ map pure ma
 
-type Tracer = TracerT Ident
+liftTracerTuple :: forall m a. Applicative m => Tuple (Array Tr) a -> TracerT m a
+liftTracerTuple = pure >>> wrap
+
+type Tracer a = TracerT Identity a
+
+derive instance genericTracerT :: Generic (TracerT m a) _
 
 derive instance newtypeTracerT :: Newtype (TracerT m a) _
 
-instance functorTracerT :: Functor m => Functor (TracerT m) where
+instance (Show (m String), Functor m, Show a) => Show (TracerT m a) where
+  show = show <<< map show <<< unwrap
+
+instance Functor m => Functor (TracerT m) where
   map = over TracerT <<< map <<< map
 
-instance applyTinC :: Apply m => Apply (TracerT m) where
+instance Apply m => Apply (TracerT m) where
   apply f a = wrap (lift2 apply (unwrap f) (unwrap a))
 
-instance applicativeTinC :: Applicative m => Applicative (TracerT m) where
+instance Applicative m => Applicative (TracerT m) where
   pure = wrap <<< pure <<< pure
 
-instance bindTinC :: Monad m => Bind (TracerT m) where
+instance (Applicative m, Bind m) => Bind (TracerT m) where
   bind t f =
     wrap do
-      TracerT (Tuple trsl a) <- unwrap t
-      TracerT (Tuple trsr b) <- unwrap $ f a
-      pure $ Tracer (trsl <> trsr)
-
--- derive instance genericTracer :: Generic (Tracer a) _
-
--- instance showTracer :: Show a => Show (Tracer a) where
---   show = genericShow
-
--- derive instance functorTracer :: Functor Tracer
-
--- instance applyTracer :: Apply Tracer where
---   apply :: forall a b. Tracer (a -> b) -> Tracer a -> Tracer b
---   apply (TracerT (Tuple ft f)) (Tracer at a) = Tracer (ft <> at) (f a)
-
--- instance applicativeTracer :: Applicative Tracer where
---   pure :: forall a. a -> Tracer a
---   pure = Tracer []
-
--- instance bindTracer :: Bind Tracer where
---   bind :: forall a b. Tracer a -> (a -> Tracer b) -> Tracer b
---   bind (Tracer at a) f = case f a of Tracer bt b -> Tracer (at <> bt) b
+      Tuple trsl a <- unwrap t
+      Tuple trsr b <- unwrap $ f a
+      pure $ Tuple (trsl <> trsr) b
 
 data Tr = Tr String | Clear
 
@@ -65,26 +55,29 @@ derive instance genericTr :: Generic Tr _
 instance showTr :: Show Tr where
   show = genericShow
 
-tr :: forall a. Tr -> a -> Tracer a
-tr t a = Tracer [ t ] a
+tr :: forall m a. Applicative m => Tr -> a -> TracerT m a
+tr t a = TracerT $ pure $ Tuple [ t ] a
 
-tr_ :: Tr -> Tracer Unit
+tr_ :: forall m. Applicative m => Tr -> TracerT m Unit
 tr_ t = tr t unit
 
-trace :: String -> Tracer Unit
+trace :: forall m. Applicative m => String -> TracerT m Unit
 trace = tr_ <<< Tr
 
-clear :: Tracer Unit
+clear :: forall m. Applicative m => TracerT m Unit
 clear = tr_ Clear
 
-runTracerResult :: forall a. Tracer a -> a
-runTracerResult (Tracer _trs a) = a
+runTracerTResult :: forall m a. Functor m => TracerT m a -> m a
+runTracerTResult (TracerT m) = snd <$> m
+
+runTracerTLog :: forall m a. Functor m => TracerT m a -> m (Array Tr)
+runTracerTLog (TracerT m) = fst <$> m
 
 runTracerLog :: forall a. Tracer a -> Array Tr
-runTracerLog (Tracer trs _a) = trs
+runTracerLog = runTracerTLog >>> unwrap
 
-renderTracer :: forall a. Tracer a -> String
-renderTracer = joinWith "\n" <<< map show <<< runTracerLog
+renderTracerT :: forall m a. Functor m => TracerT m a -> m String
+renderTracerT = map (joinWith "\n" <<< map show) <<< runTracerTLog
 
 logTracer :: forall a. Show a => Tracer a -> Effect Unit
 logTracer t = traverse_ log (foldl next Nothing (runTracerLog t))

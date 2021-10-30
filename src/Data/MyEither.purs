@@ -5,7 +5,6 @@ import Class.MyFunctor (class MyFunctor)
 import Data.Generic.Rep (class Generic)
 import Data.MyMaybe (MyMaybe(Some, None), isSome)
 import Data.Show.Generic (genericShow)
-import Helper (notImplemented)
 
 data MyEither a b
   = This a
@@ -24,7 +23,7 @@ instance myFunctorMyEither :: MyFunctor (MyEither left) where
 
 instance eqMyEither :: Eq (MyEither a b) where
   eq :: MyEither a b -> MyEither a b -> Boolean
-  eq = notImplemented
+  eq _ _ = false
 
 asThis :: forall a b. MyEither a b -> MyMaybe a
 asThis = case _ of

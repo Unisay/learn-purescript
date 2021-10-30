@@ -13,8 +13,8 @@ let
     (pkgs.fetchFromGitHub {
       owner = "justinwoo";
       repo = "easy-purescript-nix";
-      rev = "d0f592b71b2be222f8dcfb4f4cefb52608bbc1ae";
-      sha256 = "0bq26y836bd1y8657f182wnsl4cdr1xxbykxdgz7xm9shpii48r5";
+      rev = "d9a37c75ed361372e1545f6efbc08d819b3c28c8";
+      sha256 = "1fklhnddy5pzzbxfyrlprsq1p8b6y9v0awv1a1z0vkwqsd8y68yp";
     })
     { inherit pkgs; };
 

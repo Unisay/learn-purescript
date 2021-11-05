@@ -32,6 +32,7 @@
   "devDependencies": {
     "http-server": "^13.0.0",
     "purescript": "^0.14.1",
+    "purs-tidy": "^0.6.2",
     "purty": "^7.0.0",
     "spago": "^0.19.2"
   }

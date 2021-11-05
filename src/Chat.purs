@@ -1,18 +1,18 @@
 module Chat where
 
 import Prelude
+
 import Applicative.Parsing.Parser.Standard (keyword, naturalParser, singleParser)
 import Applicative.Parsing.Types (Parser(..), ParsingFunction, Result(..), Token(..))
-import Control.Alt ((<|>))
 import Control.Monad.Error.Class (throwError)
 import Data.Array (uncons)
 import Data.Array.NonEmpty as NE
-import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Maybe (Maybe(..), maybe, optional)
 import Data.Natural (Natural)
-import Data.Semigroup.Foldable (class Foldable1, foldr1)
+import Data.NonEmpty (NonEmpty(..))
 import Data.String (codePointFromChar)
 import Data.String.CodePoints as String
+import Homework.Todo (todo')
 
 type Nickname
   = String
@@ -26,12 +26,12 @@ newtype Natural1
 instance showNatural1 :: Show Natural1 where
   show (Natural1 x) = show x
 
-type User
-  = { nickname :: Nickname
-    , sex :: Sex
-    , age :: Natural1
-    , kids :: Natural0
-    }
+type User =
+  { nickname :: Nickname
+  , sex :: Sex
+  , age :: Natural1
+  , kids :: Natural0
+  }
 
 data Command
   = Hello User
@@ -59,9 +59,8 @@ instance showSex :: Show Sex where
 
 commandParser :: Parser Command
 commandParser =
-  choice
-    [ parserCommandHello
-    , parserCommandKiss
+  choice $ NonEmpty parserCommandHello
+    [ parserCommandKiss
     , parserCommandKick
     , parserCommandQuit
     , parserCommandList
@@ -93,8 +92,8 @@ commandParser =
 -- choice [p1] == p1
 -- choice [p1, p2, p3] == p1 <|> p2 <|> p3
 -- choice [p1, p2, p3, p4] == p1 <|> p2 <|> p3 <|> p4
-choice :: forall a. NonEmptyArray (Parser a) -> Parser a
-choice parsers = todo "implement"
+choice :: forall a. NonEmpty Array (Parser a) -> Parser a
+choice = todo' "implement"
 
 -- !hello Chiki M 39 1
 userParser :: Parser User

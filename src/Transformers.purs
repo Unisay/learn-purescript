@@ -2,13 +2,16 @@ module Transformers where
 
 import Prelude
 
+import Control.Monad.Except (runExceptT)
 import Control.Monad.Except.Trans (ExceptT(..))
-import Control.Monad.Identity.Trans (IdentityT(..))
-import Control.Monad.Maybe.Trans (MaybeT(..))
+import Control.Monad.Identity.Trans (IdentityT(..), runIdentityT)
+import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
+import Control.Monad.Reader (runReaderT)
 import Control.Monad.Reader.Trans (ReaderT(..))
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
+import Data.Newtype (unwrap)
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Homework.Todo (todo')
@@ -39,11 +42,16 @@ testStack3 a = ReaderT \_ -> MaybeT (ExceptT (IdentityT (pure (Right (Just a))))
 testStack3a :: Aff Int -> Stack3 Int
 testStack3a st = lift (lift (lift (lift st)))
 
+--------------------------------------------------------------------------------
+
 runStack1 :: forall a. Stack1 a -> Effect (Maybe (Either String a))
-runStack1 = todo' "implement"
+-- runStack1 (ExceptT (MaybeT x)) = x
+-- runStack1 = unwrap <<< unwrap
+runStack1 = runMaybeT <<< runExceptT
 
 runStack2 :: forall a. Stack2 a -> Effect (Either Int (Maybe a))
-runStack2 = todo' "please implement"
+-- runStack2 = unwrap <<< unwrap
+runStack2 = runExceptT <<< runMaybeT
 
 runStack3 :: forall a. Stack3 a -> String -> Aff (Either String (Maybe a))
-runStack3 = todo' "please implement"
+runStack3 = runReaderT >>> map (runIdentityT <<< runExceptT <<< runMaybeT)

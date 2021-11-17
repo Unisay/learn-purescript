@@ -1,60 +1,61 @@
-module Data.MyState where
+module Data.MyStateT where
 
+import Data.Identity
+import Data.Newtype
 import Prelude
 
 import Data.Array as Array
 import Data.Maybe (Maybe(..))
 
-newtype MyState s a
-  = MyState (s -> { nextState :: s, focus :: a })
+newtype MyStateT s m a
+  = MyStateT (s -> m { nextState :: s, focus :: a })
 
-instance functorMyState :: Functor (MyState s) where
-  map :: forall a b. (a -> b) -> MyState s a -> MyState s b
-  map ab (MyState sas) = MyState (map (\r -> r { focus = ab r.focus }) sas)
+type MyState s a = MyStateT s Identity a
 
-instance applyMyState :: Apply (MyState s) where
-  apply (MyState sab) (MyState sa) = MyState \s ->
-    let
-      { nextState: s', focus: ab } = sab s
-      { nextState: s'', focus: a } = sa s'
-    in
-      { nextState: s'', focus: ab a }
+derive instance newtypeMyStateT :: Newtype (MyStateT s m a) _
 
-instance applicativeMyState :: Applicative (MyState s) where
-  pure a = MyState \s -> { nextState: s, focus: a }
+instance functorMyState :: Functor m => Functor (MyStateT s m) where
+  map ab (MyStateT sas) =
+    MyStateT (map (map (\r -> r { focus = ab r.focus })) sas)
 
-instance bindMyState :: Bind (MyState s) where
-  bind (MyState ma) amb = MyState \s ->
-    let
-      { nextState: s', focus: a } = ma s
-      MyState sb = amb a
-    in
-      sb s'
+instance applyMyState :: Monad m => Apply (MyStateT s m) where
+  apply = ap
 
--- | Run a computation in the `MyState` monad.
-runMyState :: ∀ s a. MyState s a -> s -> { nextState :: s, focus :: a }
-runMyState (MyState f) s = f s
+instance applicativeMyState :: Monad m => Applicative (MyStateT s m) where
+  pure a = MyStateT \s -> pure { nextState: s, focus: a }
 
--- -- | Run a computation in the `MyState` monad, discarding the final state.
-evalMyState :: ∀ s a. MyState s a -> s -> a
-evalMyState (MyState f) s = (f s).focus
+instance bindMyStateT :: Monad m => Bind (MyStateT s m) where
+  bind (MyStateT ma) amb = wrap \s -> do -- m
+    { nextState: s', focus: a } <- ma s
+    un MyStateT (amb a) s'
 
--- -- | Run a computation in the `MyState` monad discarding the result.
-execMyState :: ∀ s a. MyState s a -> s -> s
-execMyState (MyState f) s = (f s).nextState
+instance monadMyStateT :: Monad m => Monad (MyStateT s m)
 
-get :: forall s. MyState s s
-get = MyState \s -> { nextState: s, focus: s }
+-- Run a computation in the `MyStateT` monad.
+runMyStateT :: ∀ s m a. MyStateT s m a -> s -> m { nextState :: s, focus :: a }
+runMyStateT f s = unwrap f s
 
-put :: forall x. x -> MyState x Unit
-put x = MyState \_ -> { nextState: x, focus: unit }
+-- | Run a computation in the `MyStateT` monad, discarding the final state.
+evalMyStateT :: ∀ s m a. Functor m => MyStateT s m a -> s -> m a
+evalMyStateT f s = runMyStateT f s <#> _.focus
 
-modify :: forall s. (s -> s) -> MyState s Unit
-modify f = do
-  s <- get
-  put (f s)
+-- -- -- | Run a computation in the `MyStateT` monad discarding the result.
+execMyStateT :: ∀ s m a. Functor m => MyStateT s m a -> s -> m s
+execMyStateT f s = runMyStateT f s <#> _.nextState
 
-testProgram :: MyState String Int
+-- get :: forall m s. MonadState s m => m s
+get :: ∀ s m. Applicative m => MyStateT s m s
+get = MyStateT \s -> pure { nextState: s, focus: s }
+
+-- put :: forall m s. MonadState s m => s -> m Unit
+put :: ∀ s m. Applicative m => s -> MyStateT s m Unit
+put x = MyStateT \_ -> pure { nextState: x, focus: unit }
+
+-- modify :: forall s m. MonadState s m => (s -> s) -> m s
+modify :: ∀ s m. Monad m => (s -> s) -> MyStateT s m Unit
+modify f = get >>= f >>> put
+
+testProgram :: ∀ m. Monad m => MyStateT String m Int
 testProgram = do
   put "begin"
   let x = 1000
@@ -64,10 +65,10 @@ testProgram = do
 
 type Stack = Array
 
-push :: forall a. a -> MyState (Stack a) Unit
+push :: ∀ a m. Monad m => a -> MyStateT (Stack a) m Unit
 push x = modify (Array.cons x)
 
-pop :: forall a. a -> MyState (Stack a) a
+pop :: ∀ a m. Monad m => a -> MyStateT (Stack a) m a
 pop a = do
   s <- get
   case Array.uncons s of
@@ -76,7 +77,7 @@ pop a = do
       put tail
       pure head
 
-type Calc = MyState (Stack Int)
+type Calc a = forall m. Monad m => MyStateT (Stack Int) m a
 
 calc :: Calc Int
 calc = do

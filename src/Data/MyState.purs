@@ -1,35 +1,41 @@
 module Data.MyStateT where
 
+import Control.Monad.State.Class
 import Data.Identity
 import Data.Newtype
+import Data.Tuple
 import Prelude
-
 import Data.Array as Array
 import Data.Maybe (Maybe(..))
 
-newtype MyStateT s m a
-  = MyStateT (s -> m { nextState :: s, focus :: a })
+newtype MyStateT s m a = MyStateT (s -> m { nextState :: s, focus :: a })
 
 type MyState s a = MyStateT s Identity a
 
-derive instance newtypeMyStateT :: Newtype (MyStateT s m a) _
+derive instance Newtype (MyStateT s m a) _
 
-instance functorMyState :: Functor m => Functor (MyStateT s m) where
+instance Functor m => Functor (MyStateT s m) where
   map ab (MyStateT sas) =
     MyStateT (map (map (\r -> r { focus = ab r.focus })) sas)
 
-instance applyMyState :: Monad m => Apply (MyStateT s m) where
+instance Monad m => Apply (MyStateT s m) where
   apply = ap
 
-instance applicativeMyState :: Monad m => Applicative (MyStateT s m) where
+instance Monad m => Applicative (MyStateT s m) where
   pure a = MyStateT \s -> pure { nextState: s, focus: a }
 
-instance bindMyStateT :: Monad m => Bind (MyStateT s m) where
+instance Monad m => Bind (MyStateT s m) where
   bind (MyStateT ma) amb = wrap \s -> do -- m
     { nextState: s', focus: a } <- ma s
     un MyStateT (amb a) s'
 
-instance monadMyStateT :: Monad m => Monad (MyStateT s m)
+instance Monad m => Monad (MyStateT s m)
+
+instance Monad m => MonadState s (MyStateT s m) where
+  state :: forall a. (s -> (Tuple a s)) -> MyStateT s m a
+  state f = MyStateT \s -> do
+    let Tuple focus nextState = f s
+    pure { nextState, focus }
 
 -- Run a computation in the `MyStateT` monad.
 runMyStateT :: ∀ s m a. MyStateT s m a -> s -> m { nextState :: s, focus :: a }
@@ -43,18 +49,6 @@ evalMyStateT f s = runMyStateT f s <#> _.focus
 execMyStateT :: ∀ s m a. Functor m => MyStateT s m a -> s -> m s
 execMyStateT f s = runMyStateT f s <#> _.nextState
 
--- get :: forall m s. MonadState s m => m s
-get :: ∀ s m. Applicative m => MyStateT s m s
-get = MyStateT \s -> pure { nextState: s, focus: s }
-
--- put :: forall m s. MonadState s m => s -> m Unit
-put :: ∀ s m. Applicative m => s -> MyStateT s m Unit
-put x = MyStateT \_ -> pure { nextState: x, focus: unit }
-
--- modify :: forall s m. MonadState s m => (s -> s) -> m s
-modify :: ∀ s m. Monad m => (s -> s) -> MyStateT s m Unit
-modify f = get >>= f >>> put
-
 testProgram :: ∀ m. Monad m => MyStateT String m Int
 testProgram = do
   put "begin"
@@ -66,7 +60,7 @@ testProgram = do
 type Stack = Array
 
 push :: ∀ a m. Monad m => a -> MyStateT (Stack a) m Unit
-push x = modify (Array.cons x)
+push x = void $ modify (Array.cons x)
 
 pop :: ∀ a m. Monad m => a -> MyStateT (Stack a) m a
 pop a = do
@@ -105,5 +99,5 @@ calc = do
   op f = do
     op1 <- pop 0
     op2 <- pop 0
-    push (f op1 op2)
+    void $ push (f op1 op2)
 

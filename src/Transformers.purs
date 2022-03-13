@@ -11,10 +11,8 @@ import Control.Monad.Reader.Trans (ReaderT(..))
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
-import Data.Newtype (unwrap)
 import Effect (Effect)
 import Effect.Aff (Aff)
-import Homework.Todo (todo')
 
 type Stack1 = ExceptT String (MaybeT Effect)
 

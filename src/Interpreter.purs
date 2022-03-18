@@ -2,87 +2,93 @@ module Interpreter where
 
 import Prelude
 
-import Data.Array as Array
+import Control.Monad.Except (ExceptT)
+import Control.Monad.State (State)
+import Control.Monad.State.Trans (StateT, execStateT, get, modify_)
+import Data.Either (Either, either)
+import Data.Generic.Rep (class Generic)
+import Data.Map (Map)
+import Data.Map as Map
+import Data.Show.Generic (genericShow)
+import Data.Traversable (for_)
 import Effect (Effect)
-import Effect.Console (log)
+import Effect.Console (logShow)
 
-data Program ∷ ∀ k. k → Type
-data Program a
-  = Get (String → Program a)
-  | Subscribe (Program a)
-  | Unsubscribe (Program a)
-  | Stop
+data Reg = A | B | C
 
-get ∷ ∀ a. (String → Program a) → Program a
-get sa = Get sa
+derive instance Eq Reg
+derive instance Ord Reg
+derive instance Generic Reg _
+instance Show Reg where
+  show = genericShow
 
-subscribe ∷ ∀ a. Program a → Program a
-subscribe = Subscribe
-
-unsubscribe ∷ ∀ a. Program a → Program a
-unsubscribe = Unsubscribe
-
-stop ∷ ∀ a. Program a
-stop = Stop
-
-program ∷ Program Unit
-program =
-  subscribe $
-    get case _ of
-      "ok" → unsubscribe stop
-      _ → stop
+data Asm
+  = Set Int Reg Asm
+  | Mov Reg Reg Asm
+  | Mul Asm
+  | Add Asm
+  | Ret
 
 type Log = Array String
 
-runLog ∷ ∀ a. Program a → Log
-runLog prog = go prog initialLog
+data Error = EmptyRegister Reg
+
+instance Show Error where
+  show = case _ of
+    EmptyRegister r → "Register " <> show r <> " is empty."
+
+type St = Map Reg Int
+type AsmM = StateT St (Either Error)
+
+-- | Evaluate Asm program as Effect
+-- |
+-- | > runAsm $ Add $ Set 2 B $ Set 1 A Ret
+-- | (fromFoldable [(Tuple A 1),(Tuple B 2)])
+-- |
+runAsm ∷ Asm → Effect Unit
+runAsm =
+  interpret
+    >>> flip execStateT Map.empty
+    >>> either logShow logShow
+
+interpret ∷ Asm → AsmM Unit
+interpret = case _ of
+  Set i r next →
+    modify_ (Map.insert r i) *> interpret next
+  Mov r1 r2 next → do
+    v1 ← lookup r1
+    modify_ (Map.insert r2 v1)
+    lookup r2 >>= modify_ <<< Map.insert r1
+    interpret next
+  Add next → do
+    st ← get
+    -- Homework: rewrite using lookup
+    for_ (add <$> Map.lookup A st <*> Map.lookup B st) \c →
+      modify_ $ Map.insert C c
+    interpret next
+  Mul next → do
+    st ← get
+    -- Homework: rewrite using lookup
+    for_ (mul <$> Map.lookup A st <*> Map.lookup B st) \c →
+      modify_ $ Map.insert C c
+    interpret next
+  Ret →
+    pure unit
+
   where
-  initialLog ∷ Log
-  initialLog = []
+  lookup ∷ Reg → AsmM Int
+  lookup _reg = pure 42 -- homework
 
-  go ∷ Program a → Log → Log
-  go p log = case p of
-    Get k → go (k "ok") (Array.snoc log "get")
-    Subscribe k → go k (Array.snoc log "subscribe")
-    Unsubscribe k → go k (Array.snoc log "unsubscribe")
-    Stop → Array.snoc log "stop"
+{- Homework: 
 
-runEffect ∷ ∀ a. String → Program a → Effect Unit
-runEffect userInput = case _ of
-  Get k → log "get" *> runEffect userInput (k userInput)
-  Subscribe p → log "subscribe" *> runEffect userInput p
-  Unsubscribe p → log "unsubscribe" *> runEffect userInput p
-  Stop → log "stop"
-
-{-
-
-Registers: A B C
-====================
-mov <int> <reg>
-mov <reg> <reg>
-swp <reg> <reg>
-add -> C
-mul <reg> <reg> -> C 
-ret 
-====================
-
-1 + 2 + 3 + 4 + 5
-
-mov 1 A 
-mov 2 B
-add
-mov C A
-mov 3 B
-add 
-mov C A
-mov 4 B
-add 
-mov C A
-mov 5 B
-add 
-ret
-
-type St = { a :: Int, b :: Int, c :: Int }
-interpret :: Program Int -> State St Int
-runState :: State St Int -> St -> Int
+1. Implement `lookup` and use it instead of `for_`
+2. Implement `runAsm`/`interpret` using `AsmM2`
+2. Implement `runAsm`/`interpret` using `AsmM3`.
+4. Write unit tests to prove that implemented functions work correctly!
+   
 -}
+
+type AsmM2 = ExceptT Error (State St) -- TODO: Homework
+type AsmM3 = Effect -- How about state management? 
+-- `Effect.Ref` for the rescue!
+-- https://pursuit.purescript.org/packages/purescript-refs/5.0.0

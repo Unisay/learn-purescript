@@ -29,6 +29,7 @@
   , "prelude"
   , "pseudo-random"
   , "random"
+  , "refs"
   , "strings"
   , "transformers"
   , "tuples"

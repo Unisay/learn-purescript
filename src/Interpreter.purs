@@ -190,5 +190,6 @@ runAsm3 asm = do
               in Ref.write (Tuple st' Nothing) r *> go r next
     Ret →
       pure unit
+  
   showErr :: Error -> St -> Effect Unit 
   showErr err st = Console.log $ show err <> "\n " <> show st 

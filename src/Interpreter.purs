@@ -42,7 +42,7 @@ type Log = Array String
 data Error = EmptyRegister Reg
 
 instance Show Error where
-  show =   case _ of
+  show = case _ of
     EmptyRegister r → "Register " <> show r <> " is empty."
 
 type St = Map Reg Int

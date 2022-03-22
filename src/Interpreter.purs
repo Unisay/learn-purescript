@@ -166,7 +166,7 @@ runAsm3 asm = do
             st' = Map.insert C (a + b) st
           in
             Ref.write (Tuple st' Nothing) r *> go r next
-    Mul next → stateWithoutError r $ \st →
+    Mul next → stateWithoutError r \st →
       case Map.lookup A st, Map.lookup B st of
         Nothing, _ → showErr (EmptyRegister A) st
         _, Nothing → showErr (EmptyRegister B) st

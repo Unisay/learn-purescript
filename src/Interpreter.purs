@@ -146,7 +146,7 @@ runAsm3 asm = do
   where
   go r = case _ of
     Set i reg next →
-      stateWithoutError r $ \st →
+      stateWithoutError r \st →
         Ref.write (Tuple (Map.insert reg i st) Nothing) r *> go r next
     Mov r1 r2 next → stateWithoutError r $ \st → do
       case Map.lookup r1 st, Map.lookup r2 st of

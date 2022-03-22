@@ -145,51 +145,48 @@ runAsm3 asm = do
   go r asm
   where
   go r = case _ of
-    Set i reg next → do
-      Tuple st mbError ← Ref.read r
-      case mbError of
-        Just err →
-          showErr err st
-        Nothing → do
-          Ref.write (Tuple (Map.insert reg i st) Nothing) r
-          go r next
-    Mov r1 r2 next → do
-      Tuple st mbError ← Ref.read r
-      case mbError of
-        Just err → showErr err st
-        Nothing → do
-          case Map.lookup r1 st, Map.lookup r2 st of
-            Nothing, _ → showErr (EmptyRegister r1) st
-            _, Nothing → showErr (EmptyRegister r2) st
-            Just v1, Just v2 →
-              let
-                st' = Map.insert r1 v2 <<< Map.insert r2 v1 $ st
-              in
-                Ref.write (Tuple st' Nothing) r *> go r next
-    Add next → do
-      Tuple st mbError ← Ref.read r
-      case mbError of
-        Just err → showErr err st
-        Nothing → do
-          case Map.lookup A st, Map.lookup B st of
-            Nothing, _ → showErr (EmptyRegister A) st 
-            _, Nothing → showErr (EmptyRegister B) st 
-            Just a, Just b → 
-              let st' = Map.insert C (a + b) st
-              in Ref.write (Tuple st' Nothing) r *> go r next
-    Mul next → do
-      Tuple st mbError ← Ref.read r
-      case mbError of
-        Just err → showErr err st
-        Nothing → do
-          case Map.lookup A st, Map.lookup B st of
-            Nothing, _ → showErr (EmptyRegister A) st 
-            _, Nothing → showErr (EmptyRegister B) st 
-            Just a, Just b → 
-              let st' = Map.insert C (a * b) st
-              in Ref.write (Tuple st' Nothing) r *> go r next
+    Set i reg next →
+      stateWithoutError r $ \st →
+        Ref.write (Tuple (Map.insert reg i st) Nothing) r *> go r next
+    Mov r1 r2 next → stateWithoutError r $ \st → do
+      case Map.lookup r1 st, Map.lookup r2 st of
+        Nothing, _ → showErr (EmptyRegister r1) st
+        _, Nothing → showErr (EmptyRegister r2) st
+        Just v1, Just v2 →
+          let
+            st' = Map.insert r1 v2 <<< Map.insert r2 v1 $ st
+          in
+            Ref.write (Tuple st' Nothing) r *> go r next
+    Add next → stateWithoutError r $ \st →
+      case Map.lookup A st, Map.lookup B st of
+        Nothing, _ → showErr (EmptyRegister A) st
+        _, Nothing → showErr (EmptyRegister B) st
+        Just a, Just b →
+          let
+            st' = Map.insert C (a + b) st
+          in
+            Ref.write (Tuple st' Nothing) r *> go r next
+    Mul next → stateWithoutError r $ \st →
+      case Map.lookup A st, Map.lookup B st of
+        Nothing, _ → showErr (EmptyRegister A) st
+        _, Nothing → showErr (EmptyRegister B) st
+        Just a, Just b →
+          let
+            st' = Map.insert C (a + b) st
+          in
+            Ref.write (Tuple st' Nothing) r *> go r next
     Ret →
       pure unit
-  
-  showErr :: Error -> St -> Effect Unit 
-  showErr err st = Console.log $ show err <> "\n " <> show st 
+
+  showErr ∷ Error → St → Effect Unit
+  showErr err st = Console.log $ show err <> "\n " <> show st
+
+  stateWithoutError
+    ∷ Ref (Tuple (Map Reg Int) (Maybe Error))
+    → (Map Reg Int → Effect Unit)
+    → Effect Unit
+  stateWithoutError r cont = do
+    Tuple st mbError ← Ref.read r
+    case mbError of
+      Just err → showErr err st
+      Nothing → cont st

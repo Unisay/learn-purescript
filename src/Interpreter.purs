@@ -179,8 +179,7 @@ runAsm3 asm = do
 
   showErr err st = Console.log $ show err <> "\n " <> show st
 
-  stateWithoutError r cont = do
-    Tuple st mbError ← Ref.read r
-    case mbError of
-      Just err → showErr err st
-      Nothing → cont st
+  stateWithoutError r k = 
+    Ref.read r >>= case _ of
+      Tuple s (Just err) → showErr err s
+      Tuple s Nothing → k s

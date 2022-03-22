@@ -1,7 +1,5 @@
 module Interpreter where
 
-import Data.Newtype
-import Data.Tuple.Nested
 import Prelude
 
 import Control.Monad.Error.Class (class MonadThrow, throwError)
@@ -11,11 +9,11 @@ import Control.Monad.State (State, runState)
 import Control.Monad.State.Class (class MonadState, gets)
 import Control.Monad.State.Trans (StateT, execStateT, modify_)
 import Data.Either (Either(..), either)
-import Data.Either.Nested ((\/))
 import Data.Generic.Rep (class Generic)
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), maybe)
+import Data.Newtype (class Newtype, unwrap, wrap)
 import Data.Show.Generic (genericShow)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
@@ -100,38 +98,88 @@ runAsm2 = interpret >>> exec
     Tuple (Left err) s → Console.log $ show err <> "\n " <> show s
     Tuple (Right _unit) s → Console.logShow s
 
-newtype AsmM3 a = AsmM3 (Effect (Ref (Maybe Error /\ St /\ a)))
+newtype AsmM3 a = AsmM3 (Effect (Ref (ExceptT Error (Tuple St) a)))
 
 derive instance Newtype (AsmM3 a) _
 
 instance Functor AsmM3 where
   map f asm = wrap do
-    ra ← unwrap asm
-    Tuple error (Tuple st a) ← Ref.read ra
-    Ref.new (Tuple error (Tuple st (f a)))
+    ea ← Ref.read =<< unwrap asm
+    Ref.new $ f <$> ea
 
 instance Apply AsmM3 where
-  apply = ?todo
+  apply ∷ ∀ a b. AsmM3 (a → b) → AsmM3 a → AsmM3 b
+  apply = ap
 
 instance Applicative AsmM3 where
-  pure = wrap <<< Ref.new <<< Tuple Nothing <<< Tuple Map.empty
+  pure ∷ ∀ a. a → AsmM3 a
+  pure = wrap <<< Ref.new <<< wrap <<< Tuple Map.empty <<< pure
 
 instance Bind AsmM3 where
   bind ∷ ∀ a b. AsmM3 a → (a → AsmM3 b) → AsmM3 b
-  bind = ?homework
+  bind asm f = wrap do
+    unwrap asm >>= Ref.read >>= runExceptT >>> case _ of
+      Tuple sta (Left err) → Ref.new $ wrap $ Tuple sta $ Left err
+      Tuple sta (Right a) → do
+        unwrap (f a) >>= Ref.read >>= runExceptT >>> case _ of
+          Tuple stb (Left err) →
+            let
+              st' = Map.unionWith (flip const) sta stb
+            in
+              Ref.new $ wrap $ Tuple st' $ Left err
+          Tuple stb (Right b) →
+            let
+              st' = Map.unionWith (flip const) sta stb
+            in
+              Ref.new $ wrap $ Tuple st' $ Right b
 
 instance Monad AsmM3
 
-instance MonadState St AsmM3 where
-  state ∷ ∀ a. (St → Tuple a St) → AsmM3
-  state f = ?homeworkState
-
 instance MonadThrow Error AsmM3 where
   throwError ∷ ∀ a. Error → AsmM3 a
-  throwError = ?throwError
+  throwError = wrap <<< Ref.new <<< wrap <<< Tuple Map.empty <<< Left
 
 runAsm3 ∷ Asm → Effect Unit
-runAsm3 = interpret >>> exec
+runAsm3 asm = do
+  r ← Ref.new $ Tuple (Map.empty ∷ Map Reg Int) (Nothing ∷ Maybe Error)
+  go r asm
   where
-  exec ∷ AsmM3 → Effect Unit
-  exec = ?exec
+  go r = case _ of
+    Set i reg next →
+      stateWithoutError r \st →
+        Ref.write (Tuple (Map.insert reg i st) Nothing) r *> go r next
+    Mov r1 r2 next → stateWithoutError r \st → do
+      case Map.lookup r1 st, Map.lookup r2 st of
+        Nothing, _ → showErr (EmptyRegister r1) st
+        _, Nothing → showErr (EmptyRegister r2) st
+        Just v1, Just v2 →
+          let
+            st' = Map.insert r1 v2 <<< Map.insert r2 v1 $ st
+          in
+            Ref.write (Tuple st' Nothing) r *> go r next
+    Add next → stateWithoutError r \st →
+      case Map.lookup A st, Map.lookup B st of
+        Nothing, _ → showErr (EmptyRegister A) st
+        _, Nothing → showErr (EmptyRegister B) st
+        Just a, Just b →
+          let
+            st' = Map.insert C (a + b) st
+          in
+            Ref.write (Tuple st' Nothing) r *> go r next
+    Mul next → stateWithoutError r \st →
+      case Map.lookup A st, Map.lookup B st of
+        Nothing, _ → showErr (EmptyRegister A) st
+        _, Nothing → showErr (EmptyRegister B) st
+        Just a, Just b →
+          let
+            st' = Map.insert C (a * b) st
+          in
+            Ref.write (Tuple st' Nothing) r *> go r next
+    Ret → stateWithoutError r $ Console.logShow
+
+  showErr err st = Console.log $ show err <> "\n " <> show st
+
+  stateWithoutError r k = 
+    Ref.read r >>= case _ of
+      Tuple s (Just err) → showErr err s
+      Tuple s Nothing → k s

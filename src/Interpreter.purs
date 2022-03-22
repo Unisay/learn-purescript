@@ -148,7 +148,7 @@ runAsm3 asm = do
     Set i reg next →
       stateWithoutError r \st →
         Ref.write (Tuple (Map.insert reg i st) Nothing) r *> go r next
-    Mov r1 r2 next → stateWithoutError r $ \st → do
+    Mov r1 r2 next → stateWithoutError r \st → do
       case Map.lookup r1 st, Map.lookup r2 st of
         Nothing, _ → showErr (EmptyRegister r1) st
         _, Nothing → showErr (EmptyRegister r2) st

@@ -172,18 +172,13 @@ runAsm3 asm = do
         _, Nothing → showErr (EmptyRegister B) st
         Just a, Just b →
           let
-            st' = Map.insert C (a + b) st
+            st' = Map.insert C (a * b) st
           in
             Ref.write (Tuple st' Nothing) r *> go r next
-    Ret → stateWithoutError r $ Console.log <<< show
+    Ret → stateWithoutError r $ Console.logShow
 
-  showErr ∷ Error → St → Effect Unit
   showErr err st = Console.log $ show err <> "\n " <> show st
 
-  stateWithoutError
-    ∷ Ref (Tuple (Map Reg Int) (Maybe Error))
-    → (Map Reg Int → Effect Unit)
-    → Effect Unit
   stateWithoutError r cont = do
     Tuple st mbError ← Ref.read r
     case mbError of

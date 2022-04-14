@@ -6,29 +6,30 @@
     flake-compat.url = github:edolstra/flake-compat;
     flake-utils.url = "github:numtide/flake-utils";
     nixpkgs.url = "nixpkgs/nixos-unstable";
-    zephyr.flake = false;
-    zephyr.url = "https://github.com/MaybeJustJames/zephyr/releases/download/v0.4.0/Linux.tar.gz";
+    easy-purescript-nix = {
+      url = "github:justinwoo/easy-purescript-nix";
+      flake = false;
+    };
   };
 
-  outputs = { self, nixpkgs, flake-compat, flake-utils, zephyr }:
+  outputs = { self, nixpkgs, flake-utils, flake-compat, easy-purescript-nix }:
     flake-utils.lib.eachDefaultSystem (system:
-      let pkgs = nixpkgs.legacyPackages.${system};
+      let
+        pkgs = nixpkgs.legacyPackages.${system};
+        epkgs = import easy-purescript-nix { inherit pkgs; };
       in
       {
         devShell =
           pkgs.mkShell {
-            buildInputs = with pkgs; [
-              dhall
-              httpie
-              nixpkgs-fmt
-              nodejs-16_x
-              purescript
-              spago
+            buildInputs = [
+              pkgs.dhall
+              pkgs.nixfmt
+              pkgs.nodejs-16_x
+              epkgs.purescript
+              epkgs.purs-tidy
+              epkgs.spago
+              epkgs.zephyr
             ];
-            shellHook = ''
-              export LC_ALL=C
-              export PATH=${zephyr}:$PATH
-            '';
           };
       });
 }

@@ -1,6 +1,7 @@
 module Effects where
 
 import Prelude
+
 import Effect (Effect)
 import Effects.Runtime as Runtime
 
@@ -37,33 +38,32 @@ data Eff
   | ClearScreen
   | Compose Eff Eff
 
-runEff :: Eff -> Unit
+runEff ∷ Eff → Unit
 runEff = case _ of
-  PrintLine s -> Runtime.printLine s
-  ClearScreen -> Runtime.clearScreen
-  Compose effect1 effect2 ->
+  PrintLine s → Runtime.printLine s
+  ClearScreen → Runtime.clearScreen
+  Compose effect1 effect2 →
     let
       _ = runEff effect1
-
       _ = runEff effect2
     in
       unit
 
-effectHello :: Eff
+effectHello ∷ Eff
 effectHello = PrintLine "Hello"
 
-effectClear :: Eff
+effectClear ∷ Eff
 effectClear = ClearScreen
 
-effectClearHello :: Eff
+effectClearHello ∷ Eff
 effectClearHello = composeEffsSequentially effectClear effectHello
 
-composeEffsSequentially :: Eff -> Eff -> Eff
+composeEffsSequentially ∷ Eff → Eff → Eff
 composeEffsSequentially = Compose
 
 -- | Program entry point, should be run with 
 -- | ```shell
 -- | spago run -m Effects
 -- | ```
-main :: Effect Unit
+main ∷ Effect Unit
 main = pure $ runEff effectClearHello

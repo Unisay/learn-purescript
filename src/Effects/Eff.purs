@@ -2,134 +2,225 @@ module Effects.Eff where
 
 import Prelude
 
-import Control.Monad.Reader (ReaderT(..), asks, runReaderT)
-import Data.Array as Array
+import Control.Monad.Reader (ReaderT(..), runReaderT, withReaderT)
 import Data.Symbol (class IsSymbol)
-import Data.Tuple (Tuple(..), fst, snd)
 import Effect (Effect)
-import Effect.Class (liftEffect)
+import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Class.Console as Console
-import Effect.Ref as Ref
-import Prim.Row (class Cons)
+import Prim.Row (class Cons, class Lacks)
 import Record as R
 import Type.Proxy (Proxy(..))
 
-type Eff fx = ReaderT (Record fx) Effect
+data Eff fx a
+  = Ef0 (ReaderT (Record fx) Effect a)
+  | Ef1 (ReaderT (Record fx) (Eff fx) a)
 
-newtype H f = H (f ~> Effect)
+instance Functor (Eff fx) where
+  map f (Ef1 r) = Ef1 (map f r)
+  map f (Ef0 r) = Ef0 (map f r)
+
+instance Apply (Eff fx) where
+  apply = ap
+
+instance Applicative (Eff fx) where
+  pure r = Ef0 (pure r)
+
+instance Bind (Eff fx) where
+  bind = bindEff
+
+bindEff ∷ ∀ fx a b. Eff fx a → (a → Eff fx b) → Eff fx b
+bindEff = case _ of
+  Ef0 m → \f → Ef0 $ ReaderT \r → runReaderT m r >>= \a → case f a of
+    Ef0 mb → runReaderT mb r
+    me → runEff r me
+  Ef1 e → \f → Ef1 $ ReaderT \r → runReaderT e r >>= f
+
+instance Monad (Eff fx)
+
+instance MonadEffect (Eff r) where
+  liftEffect = Ef0 <<< liftEffect
+
+newtype H (f ∷ Type → Type) g = H (f ~> g)
+
+infixr 4 type H as ~~>
+
+type HE f = f ~~> Effect
+
+sendHE
+  ∷ ∀ x s f rTail r
+  . IsSymbol s
+  ⇒ Lacks s rTail
+  ⇒ Cons s (f ~~> Effect) rTail r
+  ⇒ Proxy s
+  → f x
+  → Eff r x
+sendHE s fx = Ef0 $ ReaderT \r → let H h = R.get s r in h fx
 
 send
-  ∷ ∀ x s f r r'. IsSymbol s ⇒ Cons s (H f) r r' ⇒ Proxy s → f x → Eff r' x
-send s fx = liftEffect =<< asks (R.get s >>> \(H h) → h fx)
+  ∷ ∀ x s f rTail r
+  . IsSymbol s
+  ⇒ Lacks s rTail
+  ⇒ Cons s (f ~~> Eff rTail) rTail r
+  ⇒ Proxy s
+  → f x
+  → Eff r x
+send s fx = Ef0 $ ReaderT \(r ∷ Record r) → do
+  let (H h ∷ f ~~> Eff rTail) = R.get s r
+  let (rTail ∷ Record rTail) = R.delete s r
+  runEff rTail (h fx)
 
-runEff ∷ ∀ a. Eff () a → Effect a
-runEff eff = runReaderT eff {}
+runEff ∷ ∀ fx a. Record fx → Eff fx a → Effect a
+runEff r (Ef0 rm) = runReaderT rm r
+runEff r (Ef1 re) = runEff r $ runReaderT re r
+
+runEff0 ∷ ∀ a. Eff () a → Effect a
+runEff0 = runEff {}
+
+contramapEff ∷ ∀ r1 r2 a. (Record r2 → Record r1) → Eff r1 a → Eff r2 a
+contramapEff f (Ef0 m) = Ef0 $ withReaderT f m
+contramapEff f (Ef1 e) = Ef1 $ ReaderT \r → contramapEff f (runReaderT e (f r))
 
 {-----------------------------= Log Effect =-----------------------------------}
 
 data Log a = Log String a
 
-type LOG = H Log
+type LOG = HE Log
 
-log_ ∷ Proxy "log"
-log_ = Proxy
-
-log ∷ ∀ r. String → Eff (log ∷ LOG | r) Unit
-log msg = send log_ $ Log msg unit
+log ∷ ∀ r. Lacks "log" r ⇒ String → Eff (log ∷ LOG | r) Unit
+log msg = sendHE (Proxy ∷ Proxy "log") (Log msg unit)
 
 runNoLog ∷ ∀ a r. Eff (log ∷ LOG | r) a → Eff r a
-runNoLog eff =
-  ReaderT $ runReaderT eff <<< R.union { log: H \(Log _msg a) → pure a }
+runNoLog = contramapEff $ R.union { log: H \(Log _msg a) → pure a }
 
-logHconsole ∷ LOG
-logHconsole = H \(Log msg a) → Console.log msg $> a
+hLogConsole ∷ LOG
+hLogConsole = H \(Log msg a) → Console.log ("LOG: " <> msg) $> a
 
 runLogConsole ∷ ∀ a r. Eff (log ∷ LOG | r) a → Eff r a
-runLogConsole eff = ReaderT $ runReaderT eff <<< R.union { log: logHconsole }
+runLogConsole = contramapEff $ R.union { log: hLogConsole }
 
 {-----------------------------= Trace Effect =---------------------------------}
 
 data Trace t a = Trace t a
 
-type TRACE t = H (Trace t)
+type TRACE t = Trace t ~~> Eff (log ∷ LOG)
 
 type STRACE = TRACE String
 
-trace_ ∷ Proxy "trace"
-trace_ = Proxy
+trace_ = Proxy ∷ Proxy "trace"
 
-traced ∷ ∀ a r. Show a ⇒ a → Eff (trace ∷ STRACE | r) a
+traced
+  ∷ ∀ a r. Lacks "trace" r ⇒ Show a ⇒ a → Eff (trace ∷ STRACE | r) a
 traced a = send trace_ (Trace (show a) a)
 
-trace ∷ ∀ r. String → Eff (trace ∷ STRACE | r) Unit
+trace ∷ ∀ r. Lacks "trace" r ⇒ String → Eff (trace ∷ STRACE | r) Unit
 trace s = send trace_ (Trace s unit)
 
-runTraceConsole ∷ ∀ a r. Eff (trace ∷ STRACE | r) a → Eff r a
-runTraceConsole eff = ReaderT $ runReaderT eff <<< R.union
-  { trace: H \(Trace msg a) → Console.log msg $> a }
+hTraceConsole ∷ TRACE String
+hTraceConsole = H \(Trace msg a) → log msg $> a
+
+runTraceLog
+  ∷ ∀ a r. Eff (trace ∷ STRACE, log ∷ LOG | r) a → Eff (log ∷ LOG | r) a
+runTraceLog = contramapEff $ R.union { trace: hTraceConsole }
 
 runNoTrace ∷ ∀ a r t. Eff (trace ∷ TRACE t | r) a → Eff r a
-runNoTrace eff =
-  ReaderT $ runReaderT eff <<< R.union { trace: H \(Trace _msg a) → pure a }
+runNoTrace = contramapEff $ R.union { trace: H \(Trace _msg a) → pure a }
 
-runTraceCollect
-  ∷ ∀ a r t. Eff (trace ∷ TRACE t | r) a → Eff r (Tuple a (Array t))
-runTraceCollect eff = ReaderT \r → do
-  st ← Ref.new []
-  let
-    r' = R.union
-      { trace: H \(Trace msg a) →
-          Ref.modify_ (\msgs → Array.snoc msgs msg) st $> a
-      }
-      r
-  Tuple <$> runReaderT eff r' <*> Ref.read st
+-- runTraceCollect
+--   ∷ ∀ a r t. Eff (trace ∷ TRACE t | r) a → Eff r (Tuple (Array t) a)
+-- runTraceCollect eff = ReaderT \r → do
+--   st ← Ref.new []
+--   let
+--     r' = R.union
+--       { trace: H \(Trace msg a) →
+--           Ref.modify_ (\msgs → Array.snoc msgs msg) st $> a
+--       }
+--       r
+--   a ← runReaderT eff r'
+--   tracess ← Ref.read st
+--   pure $ Tuple tracess a
 
 {-----------------------------= State Effect =---------------------------------}
 
-data State s a = Get (s → a) | Put s a
+-- data State s a = Get (s → a) | Put s a
 
-type STATE s = H (State s)
+-- type STATE s fx = H (State s) (Eff fx)
 
-state_ ∷ Proxy "state"
-state_ = Proxy
+-- state_ ∷ Proxy "state"
+-- state_ = Proxy
 
-get ∷ ∀ s r. Eff (state ∷ STATE s | r) s
-get = send state_ (Get identity)
+-- get ∷ ∀ s r. Eff (state ∷ STATE s | r) s
+-- get = send state_ (Get identity)
 
-put ∷ ∀ s r. s → Eff (state ∷ STATE s | r) Unit
-put s = send state_ (Put s unit)
+-- put
+--   ∷ ∀ l s r r'. Lacks l r ⇒ Cons l (H (State s) (Eff r)) r r' ⇒ s → Eff r' Unit
+-- put s = send state_ (Put s unit)
 
-runState
-  ∷ ∀ a r s. s → Eff (state ∷ STATE s | r) a → Eff r (Tuple s a)
-runState s eff = ReaderT \h → do
-  r ← Ref.new s
-  a ← runReaderT eff $ R.union
-    { state: H case _ of
-        Get k → Ref.read r <#> k
-        Put w a → Ref.write w r $> a
-    }
-    h
-  s' ← Ref.read r
-  pure $ Tuple s' a
+-- runState
+--   ∷ ∀ a r s. s → Eff (state ∷ STATE s | r) a → Eff r (Tuple s a)
+-- runState s eff = ReaderT \h → do
+--   r ← Ref.new s
+--   a ← runReaderT eff $ R.union
+--     { state: H case _ of
+--         Get k → Ref.read r <#> k
+--         Put w a → Ref.write w r $> a
+--     }
+--     h
+--   s' ← Ref.read r
+--   pure $ Tuple s' a
 
-evalState ∷ ∀ a r s. s → Eff (state ∷ STATE s | r) a → Eff r a
-evalState s eff = snd <$> runState s eff
+-- evalState ∷ ∀ a r s. s → Eff (state ∷ STATE s | r) a → Eff r a
+-- evalState s eff = snd <$> runState s eff
 
-execState ∷ ∀ a r s. s → Eff (state ∷ STATE s | r) a → Eff r s
-execState s eff = fst <$> runState s eff
+-- execState ∷ ∀ a r s. s → Eff (state ∷ STATE s | r) a → Eff r s
+-- execState s eff = fst <$> runState s eff
+
+{----------------------------= Random Effect =---------------------------------}
+
+-- data Rnd a = RndInt (Int → a)
+
+-- type RND fx = H Rnd (Eff fx)
+
+-- randomInt ∷ ∀ r. Lacks "rnd" r ⇒ Eff (rnd ∷ RND r | r) Int
+-- randomInt = send (Proxy ∷ _ "rnd") (RndInt identity)
+
+-- hRandomInt ∷ H Rnd
+-- hRandomInt = H \(RndInt k) → Rnd.randomInt bottom top <#> k
+
+-- runRnd ∷ ∀ a r. Eff (rnd ∷ RND | r) a → Eff r a
+-- runRnd = withReaderT $ R.union { rnd: hRandomInt }
+
+-- runPseudoRnd
+--   ∷ ∀ a r
+--   . Seed
+--   → Eff (rnd ∷ RND, state ∷ STATE Seed | r) a
+--   → Eff (state ∷ STATE Seed | r) a
+-- runPseudoRnd seed eff = do
+--   put seed
+--   v ← hs
+--   withReaderT (R.union { rnd: H \(RndInt k) → pure $ k v }) eff
+--   where
+--   hs ∷ Eff (state ∷ STATE Seed | r) Int
+--   hs = do
+--     { newSeed, newVal } ← PR.random <$> get
+--     put newSeed
+--     pure newVal
 
 {--------------------------------= Example =-----------------------------------}
 
-test ∷ Eff (log ∷ LOG, state ∷ STATE Int, trace ∷ STRACE) Int
-test = do
-  trace "start"
-  put =<< traced 42
-  log "Saved state"
-  s ← get
-  r ← traced $ s * 2
-  put r
-  log "Updated state"
-  s' ← get
-  log "Retrieved state"
-  trace "finish"
-  traced s'
+-- test ∷ Eff (log ∷ LOG, state ∷ STATE Int, trace ∷ STRACE, rnd ∷ RND) Int
+-- test = do
+--   trace "start"
+--   put =<< traced 42
+--   log "Saved state"
+--   s ← get
+--   d ← randomInt
+--   r ← traced $ s * d
+--   put r
+--   log "Updated state"
+--   s' ← get
+--   log "Retrieved state"
+--   trace "finish"
+--   traced s'
+
+test ∷ Effect Unit
+test = trace "ok" # runTraceLog # runLogConsole # runEff0

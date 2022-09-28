@@ -117,7 +117,8 @@ let additions =
 -------------------------------
 -}
 let upstream =
-      https://github.com/purescript/package-sets/releases/download/psc-0.14.0-20210311/packages.dhall sha256:3da8be2b7b4a0e7de6186591167b363023695accffb98a8639e9e7d06e2070d6
+      https://github.com/purescript/package-sets/releases/download/psc-0.15.4-20220924/packages.dhall
+        sha256:81067801c9959b544ac870b392b8520d516b32bddaf9c98b32d40037200c071f
 
 let overrides = {=}
 
@@ -127,6 +128,26 @@ let additions =
         , repo = "https://github.com/opyapeus/purescript-pseudo-random.git"
         , version = "v0.2.2"
         }
+      , custom-prelude =
+        { dependencies = [ "debug", "either", "maybe", "prelude", "strings" ]
+        , repo = "https://github.com/Unisay/purescript-custom-prelude.git"
+        , version = "v1.1.0"
+        }
+      , hoist-error =
+        { dependencies =
+          [ "aff"
+          , "bifunctors"
+          , "effect"
+          , "either"
+          , "maybe"
+          , "prelude"
+          , "strings"
+          , "test-unit"
+          , "transformers"
+          ]
+        , repo = "https://github.com/Unisay/purescript-hoist-error.git"
+        , version = "v1.0.1"
+        }
       }
 
-in  upstream ⫽ overrides ⫽ additions
+in  upstream // overrides // additions

@@ -1,9 +1,7 @@
-"use strict";
+export const point = [42, 43];
 
-exports.point = [42, 43];
+export const alist0 = ["a", ["b", ["c", "def"]]];
 
-exports.alist0 = ["a", ["b", ["c", "def"]]];
+export const alist1 = ["t", "end"];
 
-exports.alist1 = ["t", "end"];
-
-exports.alistS = "end";
+export const alistS = "end";

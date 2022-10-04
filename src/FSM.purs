@@ -1,6 +1,7 @@
 module FSM where
 
 import Custom.Prelude
+import Prelude
 
 import Control.Monad.Cont (class MonadTrans, lift)
 import Control.Monad.State (State)
@@ -12,6 +13,7 @@ import Data.Array.NonEmpty as NEA
 import Data.Bifunctor (lmap)
 import Data.Foldable (foldl)
 import Data.Identity (Identity)
+import Data.Machine.Mealy (MealyT, Step(..), fromArray, mealy, toUnfoldable)
 import Data.Newtype (class Newtype, unwrap)
 import Data.NonEmpty (NonEmpty, (:|))
 import Data.Tuple (Tuple(..))
@@ -24,8 +26,25 @@ newtype FSMT i m o = FSMT (i → (Tuple (m o) (FSMT i m o)))
 derive instance Newtype (FSMT i m o) _
 
 instance MonadTrans (FSMT i) where
-  lift ∷ ∀ m a i. Monad m ⇒ m a → FSMT i m a
-  lift m = ?x
+  lift ∷ ∀ m a. Monad m ⇒ m a → FSMT i m a
+  lift m = FSMT \_ → Tuple m (lift m)
+
+{- Задание:
+
+сделать FSMT не бесконечным генератором output-ов а конечным (F = Finite),
+т.е. чтоб машина в ответ на любой input могла:
+* Сгенерировать output и перейти в следующее состояние; <-- это уже есть
+* Сгенерировать output и остановиться (Halt);           <-- а это надо сделать
+ближайшим аналогом является `List a`, где `Cons a (List a)` даёт бесконечный список,
+а `Nil` делает его конечным.
+
+-}
+
+instance Functor (FSMT i m)
+instance Apply (FSMT i m)
+instance Applicative (FSMT i m)
+instance Bind (FSMT i m)
+instance Monad (FSMT i m)
 
 instance MonadState s m ⇒ MonadState s (FSMT i m) where
   state f = lift (state f)
@@ -82,10 +101,13 @@ test = do
 
 type RecordPlayer = FSMT RPInput (State RPState) RPOutput
 
-data RPInput = SwitchForward | SwitchBack | OnOffButton | Pause | StopPlay
+data RPInput = Forward | Rewind | Play | Pause | Stop
 
 type RPState =
-  { nowPlaying ∷ Maybe Song, isTurnedOn ∷ Boolean, playlist ∷ Playlist }
+  { nowPlaying ∷ Maybe Song
+  , isTurnedOn ∷ Boolean
+  , playlist ∷ Playlist
+  }
 
 type RPOutput = { nowPlaying ∷ Maybe Song, isTurnedOn ∷ Boolean }
 
@@ -95,7 +117,7 @@ type Playlist = NonEmptyArray Song
 
 recordPlayerOn ∷ RecordPlayer
 recordPlayerOn = FSMT case _ of
-  SwitchForward → do
+  Forward → do
     { nowPlaying, playlist } ← get
     case nowPlaying of
       Nothing → Tuple (pure { nowPlaying: Nothing, isTurnedOn: true })
@@ -106,3 +128,18 @@ recordPlayerOn = FSMT case _ of
                 (add 1 $ fromMaybe 0 $ NEA.elemIndex song playlist)
             }
         )
+
+type M i o = MealyT Identity i o
+
+m1 ∷ ∀ a. M a Int
+m1 = pure 42
+
+m2 ∷ ∀ a. M a Int
+m2 = fromArray [ 1, 2, 3, 100 ]
+
+m3 ∷ Int → M Int String
+m3 s = mealy \i →
+  pure (Emit (show (s + i)) (m3 (s + 1)))
+
+run ∷ ∀ i o. M i o → i → Array o
+run m i = toUnfoldable i m

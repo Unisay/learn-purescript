@@ -2,114 +2,65 @@ module FSM where
 
 import Prelude
 
-import Control.Monad.Cont (class MonadTrans, lift)
 import Control.Monad.State (State)
-import Control.Monad.State.Class (class MonadState)
-import Control.Monad.State.Trans (gets, state)
-import Custom.Prelude (Maybe(..))
-import Data.Array as Array
+import Custom.Prelude (Maybe, (<<$>>))
 import Data.Array.NonEmpty (NonEmptyArray)
-import Data.Array.NonEmpty as NEA
-import Data.Bifunctor (bimap, lmap)
-import Data.Foldable (foldl)
 import Data.Identity (Identity)
-import Data.Machine.Mealy (MealyT, Step(..), fromArray, mealy, toUnfoldable)
-import Data.Newtype (class Newtype, unwrap)
-import Data.NonEmpty (NonEmpty, (:|))
-import Data.Tuple (Tuple(..))
-import Data.Tuple as Tuple
-import Effect (Effect)
-import Effect.Class.Console (log)
 
-newtype FSMT ∷ Type → (Type → Type) → Type → Type
-newtype FSMT i m o = FSMT (i → (Tuple (m o) (FSMT i m o)))
+newtype FSMT i m o = FSMT (i → m (Step i m o))
 
-derive instance Newtype (FSMT i m o) _
+data Step i m o = Halt | Next o (FSMT i m o)
 
-instance MonadTrans (FSMT i) where
-  lift ∷ ∀ m a. Monad m ⇒ m a → FSMT i m a
-  lift m = FSMT \_ → Tuple m (lift m)
+-- instance MonadTrans (FSMT i) where
+--   lift ∷ ∀ m a. Monad m ⇒ m a → FSMT i m a
+--   lift m = FSMT \_ → Next m (lift m)
 
-{- Задание:
+instance Functor m ⇒ Functor (Step i m) where
+  map f = case _ of
+    Halt → Halt
+    Next o fsmt → Next (f o) (map f fsmt)
 
-сделать FSMT не бесконечным генератором output-ов а конечным (F = Finite),
-т.е. чтоб машина в ответ на любой input могла:
-* Сгенерировать output и перейти в следующее состояние; <-- это уже есть
-* Сгенерировать output и остановиться (Halt);           <-- а это надо сделать
-ближайшим аналогом является `List a`, где `Cons a (List a)` даёт бесконечный список,
-а `Nil` делает его конечным.
+instance Monad m ⇒ Apply (Step i m) where
+  apply fab fa = case fab, fa of
+    Halt, _ → Halt
+    _, Halt → Halt
+    Next ab fsmtab, Next a fsmta → Next (ab a) (apply fsmtab fsmta)
 
--}
+instance Monad m ⇒ Applicative (Step i m) where
+  pure a = Next a halt
 
 instance Functor m ⇒ Functor (FSMT i m) where
-  map f (FSMT v) = FSMT \i → bimap (map f) (map f) (v i)
+  map f (FSMT v) = FSMT (map f <<$>> v)
 
 instance Monad m ⇒ Apply (FSMT i m) where
   apply = ap
 
 instance Monad m ⇒ Applicative (FSMT i m) where
-  pure a = FSMT $ const $ Tuple (pure a) (pure a)
+  pure = pure >>> pure >>> pure >>> FSMT
 
 instance Monad m ⇒ Bind (FSMT i m) where
-
-  bind (FSMT v) f = FSMT \i → Tuple (m' i) (fsmt' i)
-    where
-    m' i = Tuple.fst (v i) >>= \a → let (FSMT v') = f a in Tuple.fst $ v' i
-    fsmt' i = Tuple.snd (v i) >>= \a → let (FSMT v') = f a in Tuple.snd $ v' i
+  bind ∷ ∀ a b. FSMT i m a → (a → FSMT i m b) → FSMT i m b
+  bind (FSMT ia) f = FSMT \i → ia i >>= case _ of
+    Halt → pure Halt
+    Next a h | FSMT ib ← f a →
+      ib i <#> case _ of
+        Halt → Halt
+        Next b g → Next b (?h <> ?g)
 
 instance Monad m ⇒ Monad (FSMT i m)
 
-instance MonadState s m ⇒ MonadState s (FSMT i m) where
-  state f = lift (state f)
+-- instance MonadState s m ⇒ MonadState s (FSMT i m) where
+--   state f = lift (state f)
 
-stepFSMT ∷ ∀ i m o. FSMT i m o → i → Tuple (m o) (FSMT i m o)
-stepFSMT = unwrap
+halt ∷ ∀ i m o. Applicative m ⇒ FSMT i m o
+halt = FSMT $ const $ pure Halt
 
-stepFSM ∷ ∀ i o. FSM i o → i → Tuple o (FSM i o)
-stepFSM fsm = unwrap fsm >>> lmap unwrap
+stepFSMT ∷ ∀ i m o. FSMT i m o → i → m (Step i m o)
+stepFSMT (FSMT k) = k
 
 type FSM i o = FSMT i Identity o
 
 ------------------------------------------------------------------------------
-
-data Input = Push | Coin
-data Output = Red | Green
-
-derive instance Eq Output
-
-type Turnstile = FSMT Input Effect Output
-
-turnstileClosed ∷ Turnstile
-turnstileClosed = FSMT case _ of
-  Push → Tuple (log "push -> red: closed." $> Red) turnstileClosed
-  Coin → Tuple (log "coin -> green: opening..." $> Green) turnstileOpen
-
-turnstileOpen ∷ Turnstile
-turnstileOpen = FSMT case _ of
-  Push → Tuple (log "push -> red: closing... " $> Red) turnstileClosed
-  Coin → Tuple (log "coin -> green: returning coin." $> Green) turnstileOpen
-
-runTurnstile ∷ Turnstile → NonEmpty Array Input → Effect (Array Output)
-runTurnstile ts inputs = (foldl f { ts, outputs: pure [] } inputs).outputs
-  where
-  f
-    ∷ { ts ∷ Turnstile, outputs ∷ Effect (Array Output) }
-    → Input
-    → { ts ∷ Turnstile, outputs ∷ Effect (Array Output) }
-  f acc input =
-    let
-      Tuple output nextFsm = stepFSMT acc.ts input
-    in
-      { ts: nextFsm
-      , outputs: Array.snoc <$> acc.outputs <*> output
-      }
-
-test ∷ Effect Boolean
-test = do
-  let inputs = Push :| [ Push, Coin, Coin, Push, Push ]
-  outputs ← runTurnstile turnstileClosed inputs
-  pure $ outputs == [ Red, Red, Green, Green, Red, Red ]
-
 -- ⏪⏩▶⏸⏹
 
 type RecordPlayer = FSMT RPInput (State RPState) RPOutput
@@ -126,83 +77,89 @@ type RPOutput = { nowPlaying ∷ Maybe Song, isPaused ∷ Boolean }
 type Song = { author ∷ String, songName ∷ String }
 
 type Playlist = NonEmptyArray Song
+-- recordPlayerPlaying ∷ RecordPlayer
+-- recordPlayerPlaying = FSMT case _ of
+--   Forward → flip Tuple recordPlayerPlaying $
+--     gets \{ nowPlaying, playlist } →
+--       { isPaused: false
+--       , nowPlaying: do
+--           s ← nowPlaying
+--           idx ← NEA.elemIndex s playlist
+--           if idx == NEA.length playlist - 1 then Just (NEA.head playlist)
+--           else NEA.index playlist (idx + 1)
+--       }
 
-recordPlayerPlaying ∷ RecordPlayer
-recordPlayerPlaying = FSMT case _ of
-  Forward → flip Tuple recordPlayerPlaying $
-    gets \{ nowPlaying, playlist } →
-      { isPaused: false
-      , nowPlaying: do
-          s ← nowPlaying
-          idx ← NEA.elemIndex s playlist
-          if idx == NEA.length playlist - 1 then Just (NEA.head playlist)
-          else NEA.index playlist (idx + 1)
-      }
+--   Rewind → flip Tuple recordPlayerPlaying $
+--     gets \{ nowPlaying, playlist } →
+--       { isPaused: false
+--       , nowPlaying: do
+--           s ← nowPlaying
+--           idx ← NEA.elemIndex s playlist
+--           if idx == 0 then Just (NEA.last playlist)
+--           else NEA.index playlist (idx - 1)
+--       }
 
-  Rewind → flip Tuple recordPlayerPlaying $
-    gets \{ nowPlaying, playlist } →
-      { isPaused: false
-      , nowPlaying: do
-          s ← nowPlaying
-          idx ← NEA.elemIndex s playlist
-          if idx == 0 then Just (NEA.last playlist)
-          else NEA.index playlist (idx - 1)
-      }
+--   Play → Tuple
+--     (gets \{ nowPlaying } → { nowPlaying: nowPlaying, isPaused: false })
+--     recordPlayerPlaying
 
-  Play → Tuple
-    (gets \{ nowPlaying } → { nowPlaying: nowPlaying, isPaused: false })
-    recordPlayerPlaying
+--   Pause → flip Tuple recordPlayerPaused $
+--     gets \{ nowPlaying } → { nowPlaying: nowPlaying, isPaused: true }
 
-  Pause → flip Tuple recordPlayerPaused $
-    gets \{ nowPlaying } → { nowPlaying: nowPlaying, isPaused: true }
+--   Stop → flip Tuple recordPlayerPaused $ pure
+--     { nowPlaying: Nothing, isPaused: true }
 
-  Stop → flip Tuple recordPlayerPaused $ pure
-    { nowPlaying: Nothing, isPaused: true }
+-- recordPlayerPaused ∷ RecordPlayer
+-- recordPlayerPaused = FSMT case _ of
+--   Forward → flip Tuple recordPlayerPlaying $
+--     gets \{ nowPlaying, playlist } →
+--       { isPaused: true
+--       , nowPlaying: do
+--           s ← nowPlaying
+--           idx ← NEA.elemIndex s playlist
+--           if idx == NEA.length playlist - 1 then Just (NEA.head playlist)
+--           else NEA.index playlist (idx + 1)
+--       }
 
-recordPlayerPaused ∷ RecordPlayer
-recordPlayerPaused = FSMT case _ of
-  Forward → flip Tuple recordPlayerPlaying $
-    gets \{ nowPlaying, playlist } →
-      { isPaused: true
-      , nowPlaying: do
-          s ← nowPlaying
-          idx ← NEA.elemIndex s playlist
-          if idx == NEA.length playlist - 1 then Just (NEA.head playlist)
-          else NEA.index playlist (idx + 1)
-      }
+--   Rewind → flip Tuple recordPlayerPlaying $
+--     gets \{ nowPlaying, playlist } →
+--       { isPaused: true
+--       , nowPlaying: do
+--           s ← nowPlaying
+--           idx ← NEA.elemIndex s playlist
+--           if idx == 0 then Just (NEA.last playlist)
+--           else NEA.index playlist (idx - 1)
+--       }
 
-  Rewind → flip Tuple recordPlayerPlaying $
-    gets \{ nowPlaying, playlist } →
-      { isPaused: true
-      , nowPlaying: do
-          s ← nowPlaying
-          idx ← NEA.elemIndex s playlist
-          if idx == 0 then Just (NEA.last playlist)
-          else NEA.index playlist (idx - 1)
-      }
+--   Play → flip Tuple recordPlayerPlaying $
+--     gets \{ nowPlaying, playlist } → case nowPlaying of
+--       Nothing → { nowPlaying: Just $ NEA.head playlist, isPaused: false }
+--       song → { nowPlaying: song, isPaused: false }
 
-  Play → flip Tuple recordPlayerPlaying $
-    gets \{ nowPlaying, playlist } → case nowPlaying of
-      Nothing → { nowPlaying: Just $ NEA.head playlist, isPaused: false }
-      song → { nowPlaying: song, isPaused: false }
+--   Pause → Tuple
+--     (gets \{ nowPlaying } → { nowPlaying: nowPlaying, isPaused: true })
+--     recordPlayerPaused
 
-  Pause → Tuple
-    (gets \{ nowPlaying } → { nowPlaying: nowPlaying, isPaused: true })
-    recordPlayerPaused
+--   Stop → Tuple (pure { nowPlaying: Nothing, isPaused: true }) recordPlayerPaused
 
-  Stop → Tuple (pure { nowPlaying: Nothing, isPaused: true }) recordPlayerPaused
+{-
 
-type M i o = MealyT Identity i o
+  i0 -> h0 -> a0    ->   i0 -> g0 -> b0
+        |                      |
+  i1 -> h1 -> a1    ->   i1 -> g1 -> b1
+        |                      |
 
-m1 ∷ ∀ a. M a Int
-m1 = pure 42
+        ?      ?               ?     ?
 
-m2 ∷ ∀ a. M a Int
-m2 = fromArray [ 1, 2, 3, 100 ]
 
-m3 ∷ Int → M Int String
-m3 s = mealy \i →
-  pure (Emit (show (s + i)) (m3 (s + 1)))
 
-run ∷ ∀ i o. M i o → i → Array o
-run m i = toUnfoldable i m
+
+
+
+
+  i2 -> ?h2 -> a2    ->   i2 -> ?g2 -> b2
+        |                        
+  i3 -> Halt 
+
+
+-}

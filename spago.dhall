@@ -5,6 +5,7 @@
   , "argonaut-codecs"
   , "argonaut-core"
   , "arrays"
+  , "bifunctors"
   , "console"
   , "control"
   , "custom-prelude"
@@ -42,4 +43,5 @@
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]
+, backend = "purs-backend-es build"
 }

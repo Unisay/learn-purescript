@@ -22,13 +22,15 @@
         devShell =
           pkgs.mkShell {
             buildInputs = [
-              pkgs.dhall
-              pkgs.nixfmt
-              pkgs.nodejs-16_x
               epkgs.purescript
+              epkgs.purs-backend-es
               epkgs.purs-tidy
               epkgs.spago
               epkgs.zephyr
+              pkgs.dhall
+              pkgs.esbuild
+              pkgs.nixfmt
+              pkgs.nodejs-16_x
             ];
           };
       });

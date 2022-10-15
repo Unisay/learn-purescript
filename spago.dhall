@@ -5,13 +5,13 @@
   , "argonaut-codecs"
   , "argonaut-core"
   , "arrays"
-  , "bifunctors"
   , "console"
   , "control"
   , "custom-prelude"
   , "effect"
   , "either"
   , "enums"
+  , "exists"
   , "foldable-traversable"
   , "foreign"
   , "foreign-object"
@@ -34,6 +34,7 @@
   , "record"
   , "refs"
   , "strings"
+  , "tailrec"
   , "transformers"
   , "tuples"
   , "unfoldable"
@@ -43,5 +44,4 @@
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]
-, backend = "purs-backend-es build"
 }

@@ -1,4 +1,4 @@
-module Data.Coroutine.Generator where
+module Control.Coroutine.Generator where
 
 import Custom.Prelude
 

@@ -1,15 +1,17 @@
-module Data.Coroutine.Trampoline where
+module Control.Coroutine.Trampoline where
 
 import Custom.Prelude
 
 import Control.Monad.Trans.Class (class MonadTrans, lift)
 import Data.Array as Array
 import Data.Bifunctor (bimap)
+import Data.Either.Nested (type (\/))
 import Data.Function as Function
 import Effect (Effect)
+import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Class.Console (log)
 
-newtype Trampoline m r = Trampoline (m (Either (Trampoline m r) r))
+newtype Trampoline m r = Trampoline (m (Trampoline m r \/ r))
 
 bounce ∷ ∀ m r. Trampoline m r → m (Either (Trampoline m r) r)
 bounce (Trampoline m) = m
@@ -18,9 +20,9 @@ instance Functor m ⇒ Functor (Trampoline m) where
   map f (Trampoline m) = Trampoline (bimap (map f) f <$> m)
 
 instance Applicative m ⇒ Apply (Trampoline m) where
-  apply (Trampoline mf) (Trampoline ma) = Trampoline ado
-    f ← mf
-    a ← ma
+  apply trf tra = Trampoline ado
+    f ← bounce trf
+    a ← bounce tra
     in
       case f, a of
         Left tf, Left ta → Left $ apply tf ta
@@ -37,8 +39,13 @@ instance Monad m ⇒ Bind (Trampoline m) where
       Left t → pure $ Left $ bind t f
       Right r → bounce $ f r
 
+instance Monad m ⇒ Monad (Trampoline m)
+
 instance MonadTrans Trampoline where
   lift = Trampoline <<< liftA1 Right
+
+instance MonadEffect m ⇒ MonadEffect (Trampoline m) where
+  liftEffect = lift <<< liftEffect
 
 pause ∷ ∀ m. Monad m ⇒ Trampoline m Unit
 pause = Trampoline $ pure $ Left pass
@@ -69,6 +76,10 @@ interleave = Array.foldr (mzipWith Array.cons) (pure [])
 
 hello ∷ Trampoline Effect Unit
 hello = do
-  lift $ log "Hello, "
+  log "Hello, "
   pause
-  lift $ log "World!"
+  log "World!"
+
+ok ∷ Trampoline Effect Unit
+ok = do
+  log "its ok!"

@@ -1,4 +1,4 @@
-module Data.Coroutine.Iteratee where
+module Control.Coroutine.Iteratee where
 
 import Custom.Prelude
 

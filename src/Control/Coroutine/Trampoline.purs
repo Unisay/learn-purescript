@@ -2,11 +2,12 @@ module Control.Coroutine.Trampoline where
 
 import Custom.Prelude
 
+import Control.Monad.Rec.Class (class MonadRec, Step(..), tailRecM2)
 import Control.Monad.Trans.Class (class MonadTrans, lift)
 import Data.Array as Array
 import Data.Bifunctor (bimap)
 import Data.Either.Nested (type (\/))
-import Data.Function as Function
+import Data.Foldable (fold)
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Class.Console (log)
@@ -19,18 +20,10 @@ bounce (Trampoline m) = m
 instance Functor m ⇒ Functor (Trampoline m) where
   map f (Trampoline m) = Trampoline (bimap (map f) f <$> m)
 
-instance Applicative m ⇒ Apply (Trampoline m) where
-  apply trf tra = Trampoline ado
-    f ← bounce trf
-    a ← bounce tra
-    in
-      case f, a of
-        Left tf, Left ta → Left $ apply tf ta
-        Left tf, Right pa → Left $ map (Function.applyFlipped pa) tf
-        Right pf, Left ta → Left $ map pf ta
-        Right pf, Right pa → Right $ pf pa
+instance Monad m ⇒ Apply (Trampoline m) where
+  apply f a = mzipWith ($) f a
 
-instance Applicative m ⇒ Applicative (Trampoline m) where
+instance Monad m ⇒ Applicative (Trampoline m) where
   pure = Trampoline <<< pure <<< Right
 
 instance Monad m ⇒ Bind (Trampoline m) where
@@ -49,6 +42,9 @@ instance MonadEffect m ⇒ MonadEffect (Trampoline m) where
 
 pause ∷ ∀ m. Monad m ⇒ Trampoline m Unit
 pause = Trampoline $ pure $ Left pass
+
+debugPause ∷ ∀ m. MonadEffect m ⇒ String → Trampoline m Unit
+debugPause s = Trampoline $ log s $> Left pass
 
 run ∷ ∀ m r. Monad m ⇒ Trampoline m r → m r
 run t = bounce t >>= either run pure
@@ -74,12 +70,54 @@ interleave = Array.foldr (mzipWith Array.cons) (pure [])
 --------------------------------------------------------------------------------
 -- Tests -----------------------------------------------------------------------
 
-hello ∷ Trampoline Effect Unit
-hello = do
-  log "Hello, "
+thread1 ∷ Trampoline Effect Unit
+thread1 = do
   pause
-  log "World!"
+  log "1: World!"
 
-ok ∷ Trampoline Effect Unit
-ok = do
-  log "its ok!"
+thread2 ∷ Trampoline Effect Unit
+thread2 = do
+  log "2: Hello, "
+  pause
+
+threads ∷ Trampoline Effect (Array Unit)
+threads = interleave [ thread1, thread2 ]
+
+renderTrampoline ∷ ∀ m r. MonadRec m ⇒ Show r ⇒ Trampoline m r → m String
+renderTrampoline = mempty # tailRecM2 \a b →
+  bounce b <#> case _ of
+    Right r → Done $ foldWrap $ wrin ("Effect -> Result (" <> show r <> ")") a
+    Left k → Loop { a: wrap "Effect -> Pause -> (" ")" a, b: k }
+
+{-
+    > renderTrampoline threads
+    2: Hello, 
+    1: World!
+    "Effect -> Pause -> (Effect -> Result ([unit,unit]))"
+-}
+
+--------------------------------------------------------------------------------
+-- Wrap ------------------------------------------------------------------------
+
+data Wrap s = Wrap (Array s) s (Array s)
+
+derive instance Functor Wrap
+
+instance Monoid s ⇒ Semigroup (Wrap s) where
+  append w1 w2 = Wrap mempty (foldWrap w1 <> foldWrap w2) mempty
+
+instance Monoid s ⇒ Monoid (Wrap s) where
+  mempty = Wrap mempty mempty mempty
+
+wrap ∷ ∀ s. s → s → Wrap s → Wrap s
+wrap prefix suffix (Wrap before focus after) =
+  Wrap (Array.cons prefix before) focus (Array.snoc after suffix)
+
+withFocus ∷ ∀ s. (s → s) → Wrap s → Wrap s
+withFocus f (Wrap p a s) = Wrap p (f a) s
+
+wrin ∷ ∀ s. s → Wrap s → Wrap s
+wrin = withFocus <<< const
+
+foldWrap ∷ ∀ s. Monoid s ⇒ Wrap s → s
+foldWrap (Wrap prefix s suffix) = fold prefix <> s <> fold suffix

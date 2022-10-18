@@ -18,6 +18,7 @@
   , "foreign"
   , "foreign-object"
   , "free"
+  , "functors"
   , "identity"
   , "integers"
   , "lcg"

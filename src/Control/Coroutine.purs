@@ -9,7 +9,7 @@ import Control.Monad.Trans.Class (class MonadTrans, lift)
 import Data.Array as Array
 import Data.Bifunctor (bimap, lmap)
 import Data.Functor.Compose (Compose)
-import Data.Functor.Coproduct (Coproduct, left, right)
+import Data.Functor.Coproduct (Coproduct(..), left, right)
 import Data.Identity (Identity)
 import Data.Newtype (unwrap)
 import Data.Traversable (for_, traverse)
@@ -140,31 +140,28 @@ liftStateful step eof state = awaitT >>= case _ of
     let nextState /\ bs = step state a
     for_ bs yieldT *> liftStateful step eof nextState
 
--- composeTransducers
---   ∷ ∀ a b c m x y
---   . Monad m
---   ⇒ Transducer a b m x
---   → Transducer b c m y
---   → Transducer a c m (x /\ y)
--- composeTransducers t1 t2 = Coroutine (bindM2 proceed (resume t1) (resume t2))
---   where
---   proceed
---     ∷ Either (Coproduct (Function (Maybe a)) (Tuple b) _) _
---     → Either (Coproduct (Function (Maybe b)) (Tuple c) _) _
---     → m (Coroutine (Coproduct (Function (Maybe a)) (Tuple c)) m (x /\ y))
---   proceed e1 e2 = case lmap unwrap e1, lmap unwrap e2 of
---     Left (Left s), c → ?a
---     -- pure $ Left $ left $ map (flip composeTransducers (Coroutine (pure c))) s
---     c, Left (Right s) →
---       pure $ Left $ right $ map (composeTransducers (Coroutine (pure c))) s
---     Left (Right (b /\ c1)), Left (Left f) →
---       resume (c1 `composeTransducers` f (Just b))
---     Left (Right (_ /\ c1)), Right y →
---       resume $ c1 `composeTransducers` (pure y ∷ Transducer b c m y)
---     Right x, Left (Left f) →
---       resume $ (pure x ∷ Transducer a b m x) `composeTransducers` f Nothing
---     Right x, Right y →
---       pure $ Right $ x /\ y
+composeTransducers
+  ∷ ∀ a b c m x y
+  . Monad m
+  ⇒ Transducer a b m x
+  → Transducer b c m y
+  → Transducer a c m (x /\ y)
+composeTransducers t1 t2 = Coroutine do
+  e1 ← resume t1
+  e2 ← resume t2
+  case e1, e2 of
+    Right x, Right y →
+      pure $ Right $ x /\ y
+    Left (Coproduct (Left f)), e →
+      pure $ Left $ left \a → f a `composeTransducers` Coroutine (pure e)
+    e, Left (Coproduct (Right t)) →
+      pure $ Left $ right $ composeTransducers (Coroutine (pure e)) `map` t
+    Left (Coproduct (Right (b /\ k))), Left (Coproduct (Left f)) →
+      resume $ k `composeTransducers` f (Just b)
+    Left (Coproduct (Right (_ /\ k))), Right y →
+      resume $ k `composeTransducers` pure y
+    Right x, Left (Coproduct (Left f)) →
+      resume $ pure x `composeTransducers` f Nothing
 
 --------------------------------------------------------------------------------
 -- Producer/Consumer test ------------------------------------------------------

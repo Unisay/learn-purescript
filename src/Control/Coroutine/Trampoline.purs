@@ -68,20 +68,28 @@ interleave ∷ ∀ m r. Monad m ⇒ Array (Trampoline m r) → Trampoline m (Arr
 interleave = Array.foldr (mzipWith Array.cons) (pure [])
 
 --------------------------------------------------------------------------------
--- Tests -----------------------------------------------------------------------
+--- Tests ----------------------------------------------------------------------
 
 thread1 ∷ Trampoline Effect Unit
 thread1 = do
   pause
   log "1: World!"
+  pause
 
 thread2 ∷ Trampoline Effect Unit
 thread2 = do
   log "2: Hello, "
   pause
+  pause
+
+thread3 ∷ Trampoline Effect Unit
+thread3 = do
+  pause
+  pause
+  log "3: BRUH "
 
 threads ∷ Trampoline Effect (Array Unit)
-threads = interleave [ thread1, thread2 ]
+threads = interleave [ thread3, thread1, thread2 ]
 
 renderTrampoline ∷ ∀ m r. MonadRec m ⇒ Show r ⇒ Trampoline m r → m String
 renderTrampoline = mempty # tailRecM2 \a b →
@@ -97,7 +105,60 @@ renderTrampoline = mempty # tailRecM2 \a b →
 -}
 
 --------------------------------------------------------------------------------
--- Wrap ------------------------------------------------------------------------
+--- Homework -------------------------------------------------------------------
+
+threadNums ∷ Trampoline Effect Unit
+threadNums = do
+  log "1"
+  log "2"
+  pause
+  log "4"
+  pause
+  pause
+  log "7"
+  log "8"
+  pause
+
+threadFoo ∷ Trampoline Effect Unit
+threadFoo = do
+  pause
+  log "3: foo"
+  pause
+  pause
+  log "6: foo"
+  pause
+  log "9: foo"
+  pause
+
+threadBar ∷ Trampoline Effect Unit
+threadBar = do
+  pause
+  pause
+  pause
+  log "5: bar"
+  pause
+  pause
+  pause
+  log "10: bar"
+
+threadToBeContinued ∷ Trampoline Effect Unit
+threadToBeContinued = do
+  pause
+  pause
+  pause
+  pause
+  pause
+  pause
+  pause
+  pause
+  log "To be continued..."
+
+threadFooBar ∷ Trampoline Effect (Array Unit)
+threadFooBar = interleave
+  [ threadToBeContinued, threadBar, threadFoo, threadNums ]
+
+--------------------------------------------------------------------------------
+--- Wrap -----------------------------------------------------------------------
 
 data Wrap s = Wrap (Array s) s (Array s)
 

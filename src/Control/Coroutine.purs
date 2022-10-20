@@ -146,15 +146,17 @@ composeTransducers t1 t2 = Coroutine do
     Right x, Right y →
       pure $ Right $ x /\ y
     Left (Demand f), e →
-      pure $ Left $ Demand \a → f a `composeTransducers` Coroutine (pure e)
+      pure $ Left $ Demand \a → f a >-> Coroutine (pure e)
     e, Left (Supply t) →
       pure $ Left $ Supply $ composeTransducers (Coroutine (pure e)) <$> t
     Left (Supply (b /\ k)), Left (Demand f) →
-      resume $ k `composeTransducers` f (Just b)
+      resume $ k >-> f (Just b)
     Left (Supply (_ /\ k)), Right y →
-      resume $ k `composeTransducers` pure y
+      resume $ k >-> pure y
     Right x, Left (Demand f) →
-      resume $ pure x `composeTransducers` f Nothing
+      resume $ pure x >-> f Nothing
+
+infixr 9 composeTransducers as >->
 
 hoistCoroutine
   ∷ ∀ s w m x

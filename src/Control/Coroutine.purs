@@ -9,8 +9,7 @@ import Control.Monad.Trans.Class (class MonadTrans, lift)
 import Data.Array as Array
 import Data.Bifunctor (bimap, lmap)
 import Data.Functor.Compose (Compose)
-import Data.Functor.Coproduct (Coproduct(..), left, right)
-import Data.Identity (Identity)
+import Data.Identity (Identity(..))
 import Data.Newtype (unwrap)
 import Data.Traversable (for_, traverse)
 import Data.Tuple (Tuple)
@@ -87,17 +86,6 @@ runIteratee = tailRecM2 \is it →
         Left k → Loop { a: tail, b: k head }
         Right x → Done x
 
-mapSuspension
-  ∷ ∀ s w m x
-  . Functor s
-  ⇒ Monad m
-  ⇒ s ~> w
-  → Coroutine s m x
-  → Coroutine w m x
-mapSuspension nt = Coroutine <<< liftA1 f <<< resume
-  where
-  f = lmap (nt <<< map (mapSuspension nt))
-
 --------------------------------------------------------------------------------
 -- Suspension functors ---------------------------------------------------------
 
@@ -107,7 +95,12 @@ type RequestResponse request resp = Compose (Tuple request) (Function resp)
 
 -- | A suspension functor that makes a coroutine which can either demand
 -- | or supply a value every time it suspends, but not both at the same time.
-type DemandSupply demand supply = Coproduct (Function demand) (Tuple supply)
+-- type DemandSupply demand supply = Coproduct (Function demand) (Tuple supply)
+data DemandSupply demand supply k
+  = Demand (demand → k)
+  | Supply (supply /\ k)
+
+derive instance Functor (DemandSupply d s)
 
 --------------------------------------------------------------------------------
 -- Transducer ------------------------------------------------------------------
@@ -115,10 +108,10 @@ type DemandSupply demand supply = Coproduct (Function demand) (Tuple supply)
 type Transducer a b m x = Coroutine (DemandSupply (Maybe a) b) m x
 
 yieldT ∷ ∀ m a b. Monad m ⇒ b → Transducer a b m Unit
-yieldT b = suspend (right (b /\ pass))
+yieldT b = suspend (Supply (b /\ pass))
 
 awaitT ∷ ∀ m a b. Monad m ⇒ Transducer a b m (Maybe a)
-awaitT = suspend (left pure)
+awaitT = suspend (Demand pure)
 
 liftT ∷ ∀ m a b. Monad m ⇒ (a → b) → Transducer a b m Unit
 liftT f = awaitT >>= maybe pass \a → yieldT (f a) *> liftT f
@@ -152,16 +145,49 @@ composeTransducers t1 t2 = Coroutine do
   case e1, e2 of
     Right x, Right y →
       pure $ Right $ x /\ y
-    Left (Coproduct (Left f)), e →
-      pure $ Left $ left \a → f a `composeTransducers` Coroutine (pure e)
-    e, Left (Coproduct (Right t)) →
-      pure $ Left $ right $ composeTransducers (Coroutine (pure e)) `map` t
-    Left (Coproduct (Right (b /\ k))), Left (Coproduct (Left f)) →
+    Left (Demand f), e →
+      pure $ Left $ Demand \a → f a `composeTransducers` Coroutine (pure e)
+    e, Left (Supply t) →
+      pure $ Left $ Supply $ composeTransducers (Coroutine (pure e)) <$> t
+    Left (Supply (b /\ k)), Left (Demand f) →
       resume $ k `composeTransducers` f (Just b)
-    Left (Coproduct (Right (_ /\ k))), Right y →
+    Left (Supply (_ /\ k)), Right y →
       resume $ k `composeTransducers` pure y
-    Right x, Left (Coproduct (Left f)) →
+    Right x, Left (Demand f) →
       resume $ pure x `composeTransducers` f Nothing
+
+hoistCoroutine
+  ∷ ∀ s w m x
+  . Functor s
+  ⇒ Monad m
+  ⇒ s ~> w
+  → Coroutine s m x
+  → Coroutine w m x
+hoistCoroutine nt = Coroutine <<< liftA1 (lmap f) <<< resume
+  where
+  f ∷ s (Coroutine s m x) → w (Coroutine w m x)
+  f = map (hoistCoroutine nt) >>> nt
+
+fromGenerator ∷ ∀ a m x. Monad m ⇒ Generator a m x → Transducer Void a m x
+fromGenerator = hoistCoroutine Supply
+
+fromIteratee ∷ ∀ a m x. Monad m ⇒ Iteratee (Maybe a) m x → Transducer a Void m x
+fromIteratee = hoistCoroutine Demand
+
+toGenerator ∷ ∀ a m x. Monad m ⇒ Transducer Void a m x → Generator a m x
+toGenerator = hoistCoroutine case _ of
+  Demand _impossible → unsafeThrow "Transducer.toGenerator: Demand"
+  Supply t → t
+
+toIteratee ∷ ∀ a m x. Monad m ⇒ Transducer a Void m x → Iteratee (Maybe a) m x
+toIteratee = hoistCoroutine case _ of
+  Demand f → f
+  Supply _impossible → unsafeThrow "Transducer.toIteratee: Supply"
+
+toTrampoline ∷ ∀ m x. Monad m ⇒ Transducer Void Void m x → Trampoline m x
+toTrampoline = hoistCoroutine case _ of
+  Demand _impossible → unsafeThrow "Transducer.toTrampoline: Demand"
+  Supply (_ /\ k) → Identity k
 
 --------------------------------------------------------------------------------
 -- Producer/Consumer test ------------------------------------------------------

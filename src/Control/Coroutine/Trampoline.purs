@@ -18,7 +18,7 @@ bounce ∷ ∀ m r. Trampoline m r → m (Either (Trampoline m r) r)
 bounce (Trampoline m) = m
 
 instance Functor m ⇒ Functor (Trampoline m) where
-  map f (Trampoline m) = Trampoline (bimap (map f) f <$> m)
+  map f m = Trampoline (bimap (map f) f <$> bounce m)
 
 instance Monad m ⇒ Apply (Trampoline m) where
   apply f a = mzipWith ($) f a
@@ -27,8 +27,8 @@ instance Monad m ⇒ Applicative (Trampoline m) where
   pure = Trampoline <<< pure <<< Right
 
 instance Monad m ⇒ Bind (Trampoline m) where
-  bind (Trampoline m) f = Trampoline do
-    m >>= case _ of
+  bind m f = Trampoline do
+    bounce m >>= case _ of
       Left t → pure $ Left $ bind t f
       Right r → bounce $ f r
 

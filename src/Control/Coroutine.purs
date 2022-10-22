@@ -1,13 +1,12 @@
 module Control.Coroutine where
 
-import Custom.Prelude
-
 import Control.Bind (bindFlipped)
+import Control.Coroutine.Suspension.Functor (Consume(..), DemandSupply(..), Produce, fst, produce, snd)
 import Control.Monad.Rec.Class (class MonadRec, Step(..), loop2, tailRecM2)
 import Control.Monad.Trans.Class (class MonadTrans, lift)
+import Custom.Prelude (class Applicative, class Apply, class Bind, class Functor, class Monad, type (~>), Either(..), Maybe(..), Unit, Void, ap, bind, const, either, identity, map, maybe, pass, pure, unit, (#), ($), (*>), (<#>), (<$>), (<<<), (>>=), (>>>))
 import Data.Array as Array
 import Data.Bifunctor (bimap, lmap)
-import Data.Functor.Compose (Compose)
 import Data.Identity (Identity(..))
 import Data.Newtype (unwrap)
 import Data.Traversable (for_, traverse)
@@ -61,74 +60,58 @@ suspend ∷ ∀ f m a. Monad m ⇒ f (Coroutine f m a) → Coroutine f m a
 suspend = Coroutine <<< const <<< pure <<< Left
 
 type Trampoline m x = Coroutine Identity m x
-type Producer a m x = Coroutine (Tuple a) m x
-type Consumer a m x = Coroutine (Function a) m x
+type Producer a m x = Coroutine (Produce a) m x
+type Consumer a m x = Coroutine (Consume a) m x
 
 pause ∷ ∀ m. Monad m ⇒ Trampoline m Unit
 pause = suspend (pure pass)
 
 yield ∷ ∀ m x. Monad m ⇒ Functor (Tuple x) ⇒ x → Producer x m Unit
-yield x = suspend (x /\ pass)
+yield x = suspend (produce x pass)
 
 await ∷ ∀ m x. Monad m ⇒ Functor (Tuple x) ⇒ Consumer x m x
-await = suspend pure
+await = suspend (Consume pure)
 
 run ∷ ∀ m x. Monad m ⇒ Trampoline m x → m x
 run t = resume t >>= either (run <<< unwrap) pure
 
-runProducer ∷ ∀ a m x. MonadRec m ⇒ Producer a m x → m (Array a /\ x)
+runProducer ∷ ∀ a m x. MonadRec m ⇒ Producer a m x → m (Produce (Array a) x)
 runProducer = identity # tailRecM2 \f g →
   resume g <#> case _ of
-    Left (a /\ cont) → loop2 (f <<< Array.cons a) cont
-    Right x → Done $ f [] /\ x
+    Left p → loop2 (f <<< Array.cons (fst p)) (snd p)
+    Right x → Done $ produce (f []) x
 
 runConsumer ∷ ∀ a m x. MonadRec m ⇒ Array a → Consumer a m x → m x
 runConsumer = tailRecM2 \is it →
   resume it <#> case Array.uncons is of
     Nothing → case _ of
-      Left k → loop2 [] (k (unsafeThrow "No more inputs"))
+      Left (Consume k) → loop2 [] (k (unsafeThrow "No more inputs"))
       Right x → Done x
     Just { head, tail } → case _ of
-      Left k → loop2 tail (k head)
+      Left (Consume k) → loop2 tail (k head)
       Right x → Done x
 
 runProducerConsumer
   ∷ ∀ m a x y. MonadRec m ⇒ Producer a m x → Consumer a m y → m (x /\ y)
-runProducerConsumer = tailRecM2 \p c → do
-  l ← resume p
-  r ← resume c
+runProducerConsumer = tailRecM2 \producer consumer → do
+  l ← resume producer
+  r ← resume consumer
   pure case l, r of
-    Left (a /\ k), Left f → loop2 k (f a)
-    Left (_ /\ k), Right y → loop2 k (pure y)
+    Left p, Left (Consume f) → loop2 (snd p) (f (fst p))
+    Left p, Right y → loop2 (snd p) (pure y)
     Right _, Left _ → unsafeThrow "The producer ended too soon."
     Right x, Right y → Done $ x /\ y
 
 runProducerConsumer'
   ∷ ∀ m a x y. MonadRec m ⇒ Producer a m x → Consumer (Maybe a) m y → m (x /\ y)
-runProducerConsumer' = tailRecM2 \p c → do
-  l ← resume p
-  r ← resume c
+runProducerConsumer' = tailRecM2 \producer consumer → do
+  l ← resume producer
+  r ← resume consumer
   pure case l, r of
-    Left (a /\ k), Left f → loop2 k (f (Just a))
-    Left (_ /\ k), Right y → loop2 k (pure y)
-    Right x, Left f → loop2 (pure x) (f Nothing)
+    Left p, Left (Consume f) → loop2 (snd p) (f (Just (fst p)))
+    Left p, Right y → loop2 (snd p) (pure y)
+    Right x, Left (Consume f) → loop2 (pure x) (f Nothing)
     Right x, Right y → Done (x /\ y)
-
---------------------------------------------------------------------------------
--- Suspension functors ---------------------------------------------------------
-
--- | A suspension functor that makes a coroutine which supplies a request
--- | and requires a response before it can proceed.
-type RequestResponse request resp = Compose (Tuple request) (Function resp)
-
--- | A suspension functor that makes a coroutine which can either demand
--- | or supply a value every time it suspends, but not both at the same time.
--- type DemandSupply demand supply = Coproduct (Function demand) (Tuple supply)
-data DemandSupply demand supply k
-  = Demand (demand → k)
-  | Supply (supply /\ k)
-
-derive instance Functor (DemandSupply d s)
 
 --------------------------------------------------------------------------------
 -- Transducer ------------------------------------------------------------------
@@ -136,10 +119,10 @@ derive instance Functor (DemandSupply d s)
 type Transducer a b m x = Coroutine (DemandSupply (Maybe a) b) m x
 
 yieldT ∷ ∀ m a b. Monad m ⇒ b → Transducer a b m Unit
-yieldT b = suspend (Supply (b /\ pass))
+yieldT b = suspend (Supply (produce b pass))
 
 awaitT ∷ ∀ m a b. Monad m ⇒ Transducer a b m (Maybe a)
-awaitT = suspend (Demand pure)
+awaitT = suspend (Demand (Consume pure))
 
 liftT ∷ ∀ m a b. Monad m ⇒ (a → b) → Transducer a b m Unit
 liftT f = awaitT >>= maybe pass \a → yieldT (f a) *> liftT f
@@ -173,15 +156,15 @@ composeTransducers t1 t2 = Coroutine \_ → do
   case e1, e2 of
     Right x, Right y →
       pure $ Right $ x /\ y
-    Left (Demand f), e →
-      pure $ Left $ Demand \a → f a >-> Coroutine \_ → pure e
+    Left (Demand (Consume f)), e →
+      pure $ Left $ Demand $ Consume \a → f a >-> Coroutine \_ → pure e
     e, Left (Supply t) →
       pure $ Left $ Supply $ composeTransducers (Coroutine \_ → pure e) <$> t
-    Left (Supply (b /\ k)), Left (Demand f) →
-      resume $ k >-> f (Just b)
-    Left (Supply (_ /\ k)), Right y →
-      resume $ k >-> pure y
-    Right x, Left (Demand f) →
+    Left (Supply p), Left (Demand (Consume f)) →
+      resume $ snd p >-> f (Just (fst p))
+    Left (Supply p), Right y →
+      resume $ snd p >-> pure y
+    Right x, Left (Demand (Consume f)) →
       resume $ pure x >-> f Nothing
 
 infixr 9 composeTransducers as >->
@@ -215,4 +198,4 @@ toConsumer = hoistCoroutine case _ of
 toTrampoline ∷ ∀ m x. Monad m ⇒ Transducer Void Void m x → Trampoline m x
 toTrampoline = hoistCoroutine case _ of
   Demand _impossible → unsafeThrow "Transducer.toTrampoline: Demand"
-  Supply (_ /\ k) → Identity k
+  Supply p → Identity (snd p)

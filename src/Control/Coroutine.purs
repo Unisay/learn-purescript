@@ -3,8 +3,7 @@ module Control.Coroutine where
 import Custom.Prelude
 
 import Control.Bind (bindFlipped)
-import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
-import Control.Monad.Rec.Class (class MonadRec, Step(..), tailRecM2)
+import Control.Monad.Rec.Class (class MonadRec, Step(..), loop2, tailRecM2)
 import Control.Monad.Trans.Class (class MonadTrans, lift)
 import Data.Array as Array
 import Data.Bifunctor (bimap, lmap)
@@ -14,14 +13,16 @@ import Data.Newtype (unwrap)
 import Data.Traversable (for_, traverse)
 import Data.Tuple (Tuple)
 import Data.Tuple.Nested (type (/\), (/\))
-import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
-import Effect.Class.Console (log)
 import Effect.Exception.Unsafe (unsafeThrow)
 
 -- https://themonadreader.files.wordpress.com/2011/10/issue19.pdf
 
-newtype Coroutine f m r = Coroutine (Unit → m (Either (f (Coroutine f m r)) r))
+newtype Coroutine f m r =
+  Coroutine
+    ( Unit -- This "thunk" protects from stack overflow.
+      → m (Either (f (Coroutine f m r)) r)
+    )
 
 resume ∷ ∀ f m r. Coroutine f m r → m (Either (f (Coroutine f m r)) r)
 resume (Coroutine um) = um unit
@@ -36,12 +37,19 @@ instance (Functor f, Monad m) ⇒ Applicative (Coroutine f m) where
   pure = Coroutine <<< const <<< pure <<< Right
 
 instance (Functor f, Monad m) ⇒ Bind (Coroutine f m) where
-  bind coroutine f = Coroutine \_ → do
+  bind coroutine f = Coroutine \_ →
     resume coroutine >>= case _ of
       Left ft → pure $ Left $ bindFlipped f <$> ft
       Right r → resume $ f r
 
 instance (Functor f, Monad m) ⇒ Monad (Coroutine f m)
+
+instance (Monad m, Functor f) ⇒ MonadRec (Coroutine f m) where
+  tailRecM f = go
+    where
+    go s = f s >>= case _ of
+      Loop a → go a
+      Done b → pure b
 
 instance MonadTrans (Coroutine f) where
   lift = Coroutine <<< const <<< map Right
@@ -71,20 +79,40 @@ run t = resume t >>= either (run <<< unwrap) pure
 runProducer ∷ ∀ a m x. MonadRec m ⇒ Producer a m x → m (Array a /\ x)
 runProducer = identity # tailRecM2 \f g →
   resume g <#> case _ of
-    Left (a /\ cont) → Loop { a: f <<< Array.cons a, b: cont }
+    Left (a /\ cont) → loop2 (f <<< Array.cons a) cont
     Right x → Done $ f [] /\ x
 
 runConsumer ∷ ∀ a m x. MonadRec m ⇒ Array a → Consumer a m x → m x
 runConsumer = tailRecM2 \is it →
   resume it <#> case Array.uncons is of
-    Nothing →
-      case _ of
-        Left k → Loop { a: [], b: k (unsafeThrow "No more inputs") }
-        Right x → Done x
-    Just { head, tail } →
-      case _ of
-        Left k → Loop { a: tail, b: k head }
-        Right x → Done x
+    Nothing → case _ of
+      Left k → loop2 [] (k (unsafeThrow "No more inputs"))
+      Right x → Done x
+    Just { head, tail } → case _ of
+      Left k → loop2 tail (k head)
+      Right x → Done x
+
+runProducerConsumer
+  ∷ ∀ m a x y. MonadRec m ⇒ Producer a m x → Consumer a m y → m (x /\ y)
+runProducerConsumer = tailRecM2 \p c → do
+  l ← resume p
+  r ← resume c
+  pure case l, r of
+    Left (a /\ k), Left f → loop2 k (f a)
+    Left (_ /\ k), Right y → loop2 k (pure y)
+    Right _, Left _ → unsafeThrow "The producer ended too soon."
+    Right x, Right y → Done $ x /\ y
+
+runProducerConsumer'
+  ∷ ∀ m a x y. MonadRec m ⇒ Producer a m x → Consumer (Maybe a) m y → m (x /\ y)
+runProducerConsumer' = tailRecM2 \p c → do
+  l ← resume p
+  r ← resume c
+  pure case l, r of
+    Left (a /\ k), Left f → loop2 k (f (Just a))
+    Left (_ /\ k), Right y → loop2 k (pure y)
+    Right x, Left f → loop2 (pure x) (f Nothing)
+    Right x, Right y → Done (x /\ y)
 
 --------------------------------------------------------------------------------
 -- Suspension functors ---------------------------------------------------------
@@ -188,114 +216,3 @@ toTrampoline ∷ ∀ m x. Monad m ⇒ Transducer Void Void m x → Trampoline m 
 toTrampoline = hoistCoroutine case _ of
   Demand _impossible → unsafeThrow "Transducer.toTrampoline: Demand"
   Supply (_ /\ k) → Identity k
-
---------------------------------------------------------------------------------
--- Producer/Consumer test ------------------------------------------------------
-
--- | A helper function that really belongs in Control.Monad
-bindM2 ∷ ∀ m a b c. Monad m ⇒ (a → b → m c) → m a → m b → m c
-bindM2 f ma mb = ma >>= \a → mb >>= f a
-
-pipe1 ∷ ∀ m a x y. Monad m ⇒ Producer a m x → Consumer a m y → m (x /\ y)
-pipe1 g i = bindM2 proceed (resume g) (resume i)
-  where
-  proceed = case _, _ of
-    Left (a /\ k), Left f → pipe1 k (f a)
-    Left (_ /\ k), Right y → pipe1 k (pure y)
-    Right _, Left _ → unsafeThrow "The producer ended too soon."
-    Right x, Right y → pure (x /\ y)
-
-pipe2
-  ∷ ∀ m a x y. Monad m ⇒ Producer a m x → Consumer (Maybe a) m y → m (x /\ y)
-pipe2 g i = bindM2 proceed (resume g) (resume i)
-  where
-  proceed = case _, _ of
-    Left (a /\ k), Left f → pipe2 k (f $ Just a)
-    Left (_ /\ k), Right y → pipe2 k (pure y)
-    Right x, Left f → pipe2 (pure x) (f Nothing)
-    Right x, Right y → pure (x /\ y)
-
-producer ∷ Producer Int Effect Unit
-producer = do
-  let fstNum = 11
-  let sndNum = 42
-  log $ "Producer: sending first number (" <> show fstNum <> ")..."
-  yield fstNum
-  log $ "Producer: sending second number (" <> show sndNum <> ")..."
-  yield sndNum
-
-consumer ∷ Consumer Int Effect Int
-consumer = do
-  a ← log "Consumer: waiting for the first number..." *> await
-  log $ "Consumer: received first number: " <> show a
-  b ← log "Consumer: waiting for the second number..." *> await
-  log $ "Consumer: received second number: " <> show b
-  pure $ a + b
-
-testPipe1 ∷ Effect Unit
-testPipe1 = do
-  _ /\ result ← pipe1 producer consumer
-  log $ "Sum is: " <> show result
-
-{-
-    > testPipe1 
-    Producer: sending first number (11)...
-    Consumer: waiting for the first number...
-    Producer: sending second number (42)...
-    Consumer: received first number: 11
-    Consumer: waiting for the second number...
-    Consumer: received second number: 42
-    Sum is: 53
--}
-
-testPipe1TooSoon ∷ Effect Unit
-testPipe1TooSoon = do
-  let badProducer = pass
-  void $ pipe1 badProducer consumer
-
--------- ^ Runtime Error: The producer ended too soon.
-
-iteratee2 ∷ Consumer (Maybe Int) Effect (Maybe Int)
-iteratee2 = runMaybeT do
-  a ← log "Consumer: waiting for the first number..." *> MaybeT await
-  log $ "Consumer: received first number: " <> show a
-  b ← log "Consumer: waiting for the second number..." *> MaybeT await
-  log $ "Consumer: received second number: " <> show b
-  pure $ a + b
-
-testPipe2 ∷ Effect Unit
-testPipe2 = do
-  _ /\ result ← pipe2 pass iteratee2
-  log $ "Sum is: " <> show result
-
-double ∷ ∀ a m. Monad m ⇒ Transducer a a m Unit
-double = liftStateless \a → [ a, a ]
-
-doubleTrouble ∷ ∀ a m. Show a ⇒ MonadEffect m ⇒ Transducer a a m Unit
-doubleTrouble = do
-  awaitT >>= case _ of
-    Nothing → pass
-    Just a → do
-      log $ "Yielding first copy (" <> show a <> ") ..."
-      yieldT a
-      log $ "Yielding second copy (" <> show a <> ") ..."
-      yieldT a
-
-{-
-
-> runProducer $ toProducer $ fromProducer producer >-> double
-Yielding one, then two, returning three: ([1,1,2,2],(3,()))
-
-> runConsumer [Just 3, Nothing] (toConsumer $ double >-> fromConsumer (iter2 0))
-Enter a number: Enter a number: Enter a number: sum is 6
-((),())
-
-> run (toTrampoline $ fromProducer (yield 3) >-> double >-> fromConsumer (iter2 0))
-Enter a number: Enter a number: Enter a number: sum is 6
-(((),()),())
-
-> run (toTrampoline $ fromProducer (yield 3) >-> double >-> double >-> fromConsumer (iter2 0))
-Enter a number: Enter a number: Enter a number: Enter a number:
-Enter a number: sum is 12
-((((),()),()),())
--}

@@ -53,29 +53,29 @@ suspend ∷ ∀ f m a. Monad m ⇒ f (Coroutine f m a) → Coroutine f m a
 suspend = Coroutine <<< const <<< pure <<< Left
 
 type Trampoline m x = Coroutine Identity m x
-type Generator a m x = Coroutine (Tuple a) m x
-type Iteratee a m x = Coroutine (Function a) m x
+type Producer a m x = Coroutine (Tuple a) m x
+type Consumer a m x = Coroutine (Function a) m x
 
 pause ∷ ∀ m. Monad m ⇒ Trampoline m Unit
 pause = suspend (pure pass)
 
-yield ∷ ∀ m x. Monad m ⇒ Functor (Tuple x) ⇒ x → Generator x m Unit
+yield ∷ ∀ m x. Monad m ⇒ Functor (Tuple x) ⇒ x → Producer x m Unit
 yield x = suspend (x /\ pass)
 
-await ∷ ∀ m x. Monad m ⇒ Functor (Tuple x) ⇒ Iteratee x m x
+await ∷ ∀ m x. Monad m ⇒ Functor (Tuple x) ⇒ Consumer x m x
 await = suspend pure
 
 run ∷ ∀ m x. Monad m ⇒ Trampoline m x → m x
 run t = resume t >>= either (run <<< unwrap) pure
 
-runGenerator ∷ ∀ a m x. MonadRec m ⇒ Generator a m x → m (Array a /\ x)
-runGenerator = identity # tailRecM2 \f g →
+runProducer ∷ ∀ a m x. MonadRec m ⇒ Producer a m x → m (Array a /\ x)
+runProducer = identity # tailRecM2 \f g →
   resume g <#> case _ of
     Left (a /\ cont) → Loop { a: f <<< Array.cons a, b: cont }
     Right x → Done $ f [] /\ x
 
-runIteratee ∷ ∀ a m x. MonadRec m ⇒ Array a → Iteratee a m x → m x
-runIteratee = tailRecM2 \is it →
+runConsumer ∷ ∀ a m x. MonadRec m ⇒ Array a → Consumer a m x → m x
+runConsumer = tailRecM2 \is it →
   resume it <#> case Array.uncons is of
     Nothing →
       case _ of
@@ -168,21 +168,21 @@ hoistCoroutine
 hoistCoroutine nt c = Coroutine \_ →
   resume c <#> lmap (map (hoistCoroutine nt) >>> nt)
 
-fromGenerator ∷ ∀ a m x. Monad m ⇒ Generator a m x → Transducer Void a m x
-fromGenerator = hoistCoroutine Supply
+fromProducer ∷ ∀ a m x. Monad m ⇒ Producer a m x → Transducer Void a m x
+fromProducer = hoistCoroutine Supply
 
-fromIteratee ∷ ∀ a m x. Monad m ⇒ Iteratee (Maybe a) m x → Transducer a Void m x
-fromIteratee = hoistCoroutine Demand
+fromConsumer ∷ ∀ a m x. Monad m ⇒ Consumer (Maybe a) m x → Transducer a Void m x
+fromConsumer = hoistCoroutine Demand
 
-toGenerator ∷ ∀ a m x. Monad m ⇒ Transducer Void a m x → Generator a m x
-toGenerator = hoistCoroutine case _ of
-  Demand _impossible → unsafeThrow "Transducer.toGenerator: Demand"
+toProducer ∷ ∀ a m x. Monad m ⇒ Transducer Void a m x → Producer a m x
+toProducer = hoistCoroutine case _ of
+  Demand _impossible → unsafeThrow "Transducer.toProducer: Demand"
   Supply t → t
 
-toIteratee ∷ ∀ a m x. Monad m ⇒ Transducer a Void m x → Iteratee (Maybe a) m x
-toIteratee = hoistCoroutine case _ of
+toConsumer ∷ ∀ a m x. Monad m ⇒ Transducer a Void m x → Consumer (Maybe a) m x
+toConsumer = hoistCoroutine case _ of
   Demand f → f
-  Supply _impossible → unsafeThrow "Transducer.toIteratee: Supply"
+  Supply _impossible → unsafeThrow "Transducer.toConsumer: Supply"
 
 toTrampoline ∷ ∀ m x. Monad m ⇒ Transducer Void Void m x → Trampoline m x
 toTrampoline = hoistCoroutine case _ of
@@ -196,7 +196,7 @@ toTrampoline = hoistCoroutine case _ of
 bindM2 ∷ ∀ m a b c. Monad m ⇒ (a → b → m c) → m a → m b → m c
 bindM2 f ma mb = ma >>= \a → mb >>= f a
 
-pipe1 ∷ ∀ m a x y. Monad m ⇒ Generator a m x → Iteratee a m y → m (x /\ y)
+pipe1 ∷ ∀ m a x y. Monad m ⇒ Producer a m x → Consumer a m y → m (x /\ y)
 pipe1 g i = bindM2 proceed (resume g) (resume i)
   where
   proceed = case _, _ of
@@ -206,7 +206,7 @@ pipe1 g i = bindM2 proceed (resume g) (resume i)
     Right x, Right y → pure (x /\ y)
 
 pipe2
-  ∷ ∀ m a x y. Monad m ⇒ Generator a m x → Iteratee (Maybe a) m y → m (x /\ y)
+  ∷ ∀ m a x y. Monad m ⇒ Producer a m x → Consumer (Maybe a) m y → m (x /\ y)
 pipe2 g i = bindM2 proceed (resume g) (resume i)
   where
   proceed = case _, _ of
@@ -215,52 +215,52 @@ pipe2 g i = bindM2 proceed (resume g) (resume i)
     Right x, Left f → pipe2 (pure x) (f Nothing)
     Right x, Right y → pure (x /\ y)
 
-generator ∷ Generator Int Effect Unit
-generator = do
+producer ∷ Producer Int Effect Unit
+producer = do
   let fstNum = 11
   let sndNum = 42
-  log $ "Generator: sending first number (" <> show fstNum <> ")..."
+  log $ "Producer: sending first number (" <> show fstNum <> ")..."
   yield fstNum
-  log $ "Generator: sending second number (" <> show sndNum <> ")..."
+  log $ "Producer: sending second number (" <> show sndNum <> ")..."
   yield sndNum
 
-iteratee ∷ Iteratee Int Effect Int
-iteratee = do
-  a ← log "Iteratee: waiting for the first number..." *> await
-  log $ "Iteratee: received first number: " <> show a
-  b ← log "Iteratee: waiting for the second number..." *> await
-  log $ "Iteratee: received second number: " <> show b
+consumer ∷ Consumer Int Effect Int
+consumer = do
+  a ← log "Consumer: waiting for the first number..." *> await
+  log $ "Consumer: received first number: " <> show a
+  b ← log "Consumer: waiting for the second number..." *> await
+  log $ "Consumer: received second number: " <> show b
   pure $ a + b
 
 testPipe1 ∷ Effect Unit
 testPipe1 = do
-  _ /\ result ← pipe1 generator iteratee
+  _ /\ result ← pipe1 producer consumer
   log $ "Sum is: " <> show result
 
 {-
     > testPipe1 
-    Generator: sending first number (11)...
-    Iteratee: waiting for the first number...
-    Generator: sending second number (42)...
-    Iteratee: received first number: 11
-    Iteratee: waiting for the second number...
-    Iteratee: received second number: 42
+    Producer: sending first number (11)...
+    Consumer: waiting for the first number...
+    Producer: sending second number (42)...
+    Consumer: received first number: 11
+    Consumer: waiting for the second number...
+    Consumer: received second number: 42
     Sum is: 53
 -}
 
 testPipe1TooSoon ∷ Effect Unit
 testPipe1TooSoon = do
-  let badGenerator = pass
-  void $ pipe1 badGenerator iteratee
+  let badProducer = pass
+  void $ pipe1 badProducer consumer
 
 -------- ^ Runtime Error: The producer ended too soon.
 
-iteratee2 ∷ Iteratee (Maybe Int) Effect (Maybe Int)
+iteratee2 ∷ Consumer (Maybe Int) Effect (Maybe Int)
 iteratee2 = runMaybeT do
-  a ← log "Iteratee: waiting for the first number..." *> MaybeT await
-  log $ "Iteratee: received first number: " <> show a
-  b ← log "Iteratee: waiting for the second number..." *> MaybeT await
-  log $ "Iteratee: received second number: " <> show b
+  a ← log "Consumer: waiting for the first number..." *> MaybeT await
+  log $ "Consumer: received first number: " <> show a
+  b ← log "Consumer: waiting for the second number..." *> MaybeT await
+  log $ "Consumer: received second number: " <> show b
   pure $ a + b
 
 testPipe2 ∷ Effect Unit
@@ -268,21 +268,33 @@ testPipe2 = do
   _ /\ result ← pipe2 pass iteratee2
   log $ "Sum is: " <> show result
 
-{-
-let double = liftStateless \a -> [a, a]
+double ∷ ∀ a m. Monad m ⇒ Transducer a a m Unit
+double = liftStateless \a → [ a, a ]
 
-> runGenerator $ toGenerator $ fromGenerator generator >-> double
+doubleTrouble ∷ ∀ a m. Show a ⇒ MonadEffect m ⇒ Transducer a a m Unit
+doubleTrouble = do
+  awaitT >>= case _ of
+    Nothing → pass
+    Just a → do
+      log $ "Yielding first copy (" <> show a <> ") ..."
+      yieldT a
+      log $ "Yielding second copy (" <> show a <> ") ..."
+      yieldT a
+
+{-
+
+> runProducer $ toProducer $ fromProducer producer >-> double
 Yielding one, then two, returning three: ([1,1,2,2],(3,()))
 
-> runIteratee [Just 3, Nothing] (toIteratee $ double >-> fromIteratee (iter2 0))
+> runConsumer [Just 3, Nothing] (toConsumer $ double >-> fromConsumer (iter2 0))
 Enter a number: Enter a number: Enter a number: sum is 6
 ((),())
 
-> run (toTrampoline $ fromGenerator (yield 3) >-> double >-> fromIteratee (iter2 0))
+> run (toTrampoline $ fromProducer (yield 3) >-> double >-> fromConsumer (iter2 0))
 Enter a number: Enter a number: Enter a number: sum is 6
 (((),()),())
 
-> run (toTrampoline $ fromGenerator (yield 3) >-> double >-> double >-> fromIteratee (iter2 0))
+> run (toTrampoline $ fromProducer (yield 3) >-> double >-> double >-> fromConsumer (iter2 0))
 Enter a number: Enter a number: Enter a number: Enter a number:
 Enter a number: sum is 12
 ((((),()),()),())

@@ -21,22 +21,22 @@ import Effect.Exception.Unsafe (unsafeThrow)
 
 -- https://themonadreader.files.wordpress.com/2011/10/issue19.pdf
 
-newtype Coroutine f m r = Coroutine (m (Either (f (Coroutine f m r)) r))
+newtype Coroutine f m r = Coroutine (Unit → m (Either (f (Coroutine f m r)) r))
 
 resume ∷ ∀ f m r. Coroutine f m r → m (Either (f (Coroutine f m r)) r)
-resume (Coroutine m) = m
+resume (Coroutine um) = um unit
 
 instance (Functor f, Functor m) ⇒ Functor (Coroutine f m) where
-  map f (Coroutine m) = Coroutine (bimap (map (map f)) f <$> m)
+  map f c = Coroutine \_ → bimap (map (map f)) f <$> resume c
 
 instance (Functor f, Monad m) ⇒ Apply (Coroutine f m) where
   apply = ap
 
 instance (Functor f, Monad m) ⇒ Applicative (Coroutine f m) where
-  pure = Coroutine <<< pure <<< Right
+  pure = Coroutine <<< const <<< pure <<< Right
 
 instance (Functor f, Monad m) ⇒ Bind (Coroutine f m) where
-  bind coroutine f = Coroutine do
+  bind coroutine f = Coroutine \_ → do
     resume coroutine >>= case _ of
       Left ft → pure $ Left $ bindFlipped f <$> ft
       Right r → resume $ f r
@@ -44,13 +44,13 @@ instance (Functor f, Monad m) ⇒ Bind (Coroutine f m) where
 instance (Functor f, Monad m) ⇒ Monad (Coroutine f m)
 
 instance MonadTrans (Coroutine f) where
-  lift = Coroutine <<< liftA1 Right
+  lift = Coroutine <<< const <<< map Right
 
 instance (Functor f, MonadEffect m) ⇒ MonadEffect (Coroutine f m) where
   liftEffect = lift <<< liftEffect
 
 suspend ∷ ∀ f m a. Monad m ⇒ f (Coroutine f m a) → Coroutine f m a
-suspend = Coroutine <<< pure <<< Left
+suspend = Coroutine <<< const <<< pure <<< Left
 
 type Trampoline m x = Coroutine Identity m x
 type Generator a m x = Coroutine (Tuple a) m x
@@ -139,16 +139,16 @@ composeTransducers
   ⇒ Transducer a b m x
   → Transducer b c m y
   → Transducer a c m (x /\ y)
-composeTransducers t1 t2 = Coroutine do
+composeTransducers t1 t2 = Coroutine \_ → do
   e1 ← resume t1
   e2 ← resume t2
   case e1, e2 of
     Right x, Right y →
       pure $ Right $ x /\ y
     Left (Demand f), e →
-      pure $ Left $ Demand \a → f a >-> Coroutine (pure e)
+      pure $ Left $ Demand \a → f a >-> Coroutine \_ → pure e
     e, Left (Supply t) →
-      pure $ Left $ Supply $ composeTransducers (Coroutine (pure e)) <$> t
+      pure $ Left $ Supply $ composeTransducers (Coroutine \_ → pure e) <$> t
     Left (Supply (b /\ k)), Left (Demand f) →
       resume $ k >-> f (Just b)
     Left (Supply (_ /\ k)), Right y →
@@ -165,10 +165,8 @@ hoistCoroutine
   ⇒ s ~> w
   → Coroutine s m x
   → Coroutine w m x
-hoistCoroutine nt = Coroutine <<< liftA1 (lmap f) <<< resume
-  where
-  f ∷ s (Coroutine s m x) → w (Coroutine w m x)
-  f = map (hoistCoroutine nt) >>> nt
+hoistCoroutine nt c = Coroutine \_ →
+  resume c <#> lmap (map (hoistCoroutine nt) >>> nt)
 
 fromGenerator ∷ ∀ a m x. Monad m ⇒ Generator a m x → Transducer Void a m x
 fromGenerator = hoistCoroutine Supply
@@ -269,3 +267,23 @@ testPipe2 ∷ Effect Unit
 testPipe2 = do
   _ /\ result ← pipe2 pass iteratee2
   log $ "Sum is: " <> show result
+
+{-
+let double = liftStateless \a -> [a, a]
+
+> runGenerator $ toGenerator $ fromGenerator generator >-> double
+Yielding one, then two, returning three: ([1,1,2,2],(3,()))
+
+> runIteratee [Just 3, Nothing] (toIteratee $ double >-> fromIteratee (iter2 0))
+Enter a number: Enter a number: Enter a number: sum is 6
+((),())
+
+> run (toTrampoline $ fromGenerator (yield 3) >-> double >-> fromIteratee (iter2 0))
+Enter a number: Enter a number: Enter a number: sum is 6
+(((),()),())
+
+> run (toTrampoline $ fromGenerator (yield 3) >-> double >-> double >-> fromIteratee (iter2 0))
+Enter a number: Enter a number: Enter a number: Enter a number:
+Enter a number: sum is 12
+((((),()),()),())
+-}

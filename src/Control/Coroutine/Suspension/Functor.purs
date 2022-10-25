@@ -3,6 +3,7 @@ module Control.Coroutine.Suspension.Functor where
 import Custom.Prelude
 
 import Data.Function.Uncurried (Fn2, runFn2)
+import Data.Functor.Coproduct (Coproduct)
 
 newtype Consume a b = Consume (a → b)
 
@@ -33,3 +34,12 @@ data DemandSupply demand supply k
   | Supply (Produce supply k)
 
 derive instance Functor (DemandSupply d s)
+
+type Split a = Coproduct
+  (Consume (Maybe a))
+  (Coproduct (Produce a) (Produce a))
+
+type Join a = Coproduct
+  (Coproduct (Consume (Maybe a)) (Consume (Maybe a)))
+  (Produce a)
+

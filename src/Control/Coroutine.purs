@@ -1,12 +1,13 @@
 module Control.Coroutine where
 
 import Control.Bind (bindFlipped)
-import Control.Coroutine.Suspension.Functor (Consume(..), DemandSupply(..), Produce, fst, produce, snd)
+import Control.Coroutine.Suspension.Functor (Consume(..), DemandSupply(..), Join, Produce, Split, fst, produce, snd)
 import Control.Monad.Rec.Class (class MonadRec, Step(..), loop2, tailRecM2)
 import Control.Monad.Trans.Class (class MonadTrans, lift)
 import Custom.Prelude (class Applicative, class Apply, class Bind, class Functor, class Monad, type (~>), Either(..), Maybe(..), Unit, Void, ap, bind, const, either, identity, map, maybe, pass, pure, unit, (#), ($), (*>), (<#>), (<$>), (<<<), (>>=), (>>>))
 import Data.Array as Array
 import Data.Bifunctor (bimap, lmap)
+import Data.Functor.Coproduct (left, right)
 import Data.Identity (Identity(..))
 import Data.Newtype (unwrap)
 import Data.Traversable (for_, traverse)
@@ -199,3 +200,39 @@ toTrampoline ∷ ∀ m x. Monad m ⇒ Transducer Void Void m x → Trampoline m 
 toTrampoline = hoistCoroutine case _ of
   Demand _impossible → unsafeThrow "Transducer.toTrampoline: Demand"
   Supply p → Identity (snd p)
+
+--------------------------------------------------------------------------------
+-- Branching
+--------------------------------------------------------------------------------
+
+type Splitter a m x = Coroutine (Split a) m x
+
+type Joiner a m x = Coroutine (Join a) m x
+
+yieldLeft ∷ ∀ a m. Monad m ⇒ a → Splitter a m Unit
+yieldLeft a = suspend (right (left (produce a pass)))
+
+yieldRight ∷ ∀ a m. Monad m ⇒ a → Splitter a m Unit
+yieldRight a = suspend (right (right (produce a pass)))
+
+awaitLeft ∷ ∀ a m. Monad m ⇒ Joiner a m (Maybe a)
+awaitLeft = suspend (left (left (Consume pure)))
+
+awaitRight ∷ ∀ a m. Monad m ⇒ Joiner a m (Maybe a)
+awaitRight = suspend (left (right (Consume pure)))
+
+ifThenElse
+  ∷ ∀ a b m x y z
+  . Monad m
+  ⇒ Splitter a m x
+  → Transducer a b m y
+  → Transducer a b m z
+  → Transducer a b m (x /\ y /\ z)
+ifThenElse splitter tr1 tr2 = ?x
+
+-- not :: Monad m ⇒ Splitter a m x → Splitter a m x
+-- and :: Monad m ⇒ Splitter a m x → Splitter a m x → Splitter a m x
+-- or :: Monad m ⇒ Splitter a m x → Splitter a m x → Splitter a m x
+-- groupBy :: Monad m ⇒ Splitter a m x → Transducer a [a ] m x
+-- any :: Monad m ⇒ Splitter a m x → Splitter [a ] m x
+-- all :: Monad m ⇒ Splitter a m x → Splitter [a ] m x

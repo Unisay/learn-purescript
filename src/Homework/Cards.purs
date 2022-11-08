@@ -2,14 +2,23 @@ module Homework.Cards where
 
 import Custom.Prelude
 
-import Control.Coroutine (Consumer, Coroutine(..), Producer, Transducer, await, liftStateless, runPipeline, transduceProducer)
+import Control.Coroutine
+  ( Consumer
+  , Coroutine(..)
+  , Producer
+  , Transducer
+  , await
+  , liftStateless
+  , runPipeline
+  , transduceProducer
+  )
 import Control.Coroutine.Suspension.Functor (Consume(..), produce)
 import Control.Monad.State (StateT, get, runStateT)
 import Control.Monad.State.Trans (modify_)
 import Data.Array (modifyAt, (:))
 import Data.Array as Array
 import Data.Enum (toEnum)
-import Data.String.CodePoints (CodePoint, codePointFromChar, fromCodePointArray)
+import Data.String.CodePoints (CodePoint, fromCodePointArray)
 import Data.Traversable (traverse_)
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
@@ -61,9 +70,6 @@ cardFromInt ∷ Int → Maybe Card
 cardFromInt i
   | i >= 1 && i <= 36 = toEnum (startingIndex + i)
   | otherwise = Nothing
-
-playerData ∷ PlayerData
-playerData = { name: "Vadym", hand: [] }
 
 handCapacity ∷ Int
 handCapacity = 6

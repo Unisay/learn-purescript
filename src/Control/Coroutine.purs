@@ -1,10 +1,12 @@
 module Control.Coroutine where
 
+import Custom.Prelude
+
 import Control.Bind (bindFlipped)
 import Control.Coroutine.Suspension.Functor (Consume(..), DemandSupply(..), Produce, fst, produce, snd)
 import Control.Monad.Rec.Class (class MonadRec, Step(..), loop2, tailRecM2)
+import Control.Monad.State.Class (class MonadState, state)
 import Control.Monad.Trans.Class (class MonadTrans, lift)
-import Custom.Prelude (class Applicative, class Apply, class Bind, class Functor, class Monad, type (~>), Either(..), Maybe(..), Unit, Void, ap, bind, const, either, identity, map, maybe, pass, pure, unit, (#), ($), (*>), (<#>), (<$>), (<<<), (>>=), (>>>))
 import Data.Array as Array
 import Data.Bifunctor (bimap, lmap)
 import Data.Identity (Identity(..))
@@ -43,7 +45,7 @@ instance (Functor f, Monad m) ⇒ Bind (Coroutine f m) where
 
 instance (Functor f, Monad m) ⇒ Monad (Coroutine f m)
 
-instance (Monad m, Functor f) ⇒ MonadRec (Coroutine f m) where
+instance (Functor f, Monad m) ⇒ MonadRec (Coroutine f m) where
   tailRecM f = go
     where
     go s = f s >>= case _ of
@@ -55,6 +57,9 @@ instance MonadTrans (Coroutine f) where
 
 instance (Functor f, MonadEffect m) ⇒ MonadEffect (Coroutine f m) where
   liftEffect = lift <<< liftEffect
+
+instance (Functor f, MonadState s m) ⇒ MonadState s (Coroutine f m) where
+  state f = lift (state f)
 
 suspend ∷ ∀ f m a. Monad m ⇒ f (Coroutine f m a) → Coroutine f m a
 suspend = Coroutine <<< const <<< pure <<< Left
@@ -102,19 +107,28 @@ runProducerConsumer = tailRecM2 \producer consumer → do
     Right _, Left _ → unsafeThrow "The producer ended too soon."
     Right x, Right y → Done $ x /\ y
 
-runProducerConsumer'
-  ∷ ∀ m a x y. MonadRec m ⇒ Producer a m x → Consumer (Maybe a) m y → m (x /\ y)
-runProducerConsumer' = tailRecM2 \producer consumer → do
+data PipelineResult producerRes consumerRes
+  = BothEnded producerRes consumerRes
+  | ProducerEndedPrematurely producerRes
+  | ConsumerEndedPrematurely consumerRes
+
+runPipeline
+  ∷ ∀ m a x y
+  . MonadRec m
+  ⇒ Producer a m x
+  → Consumer (Maybe a) m y
+  → m (PipelineResult x y)
+runPipeline = tailRecM2 \producer consumer → do
   l ← resume producer
   r ← resume consumer
   pure case l, r of
     Left p, Left (Consume f) → loop2 (snd p) (f (Just (fst p)))
-    Left p, Right y → loop2 (snd p) (pure y)
-    Right x, Left (Consume f) → loop2 (pure x) (f Nothing)
-    Right x, Right y → Done (x /\ y)
+    Left _, Right y → Done (ConsumerEndedPrematurely y)
+    Right x, Left _ → Done (ProducerEndedPrematurely x)
+    Right x, Right y → Done (BothEnded x y)
 
 --------------------------------------------------------------------------------
--- Transducer ------------------------------------------------------------------
+--- Transducer -----------------------------------------------------------------
 
 type Transducer a b m x = Coroutine (DemandSupply (Maybe a) b) m x
 
@@ -199,3 +213,19 @@ toTrampoline ∷ ∀ m x. Monad m ⇒ Transducer Void Void m x → Trampoline m 
 toTrampoline = hoistCoroutine case _ of
   Demand _impossible → unsafeThrow "Transducer.toTrampoline: Demand"
   Supply p → Identity (snd p)
+
+transduceProducer
+  ∷ ∀ a b m x y
+  . Monad m
+  ⇒ Producer a m x
+  → Transducer a b m y
+  → Producer b m (x /\ y)
+transduceProducer p t = toProducer $ fromProducer p >-> t
+
+transduceConsumer
+  ∷ ∀ a b m x y
+  . Monad m
+  ⇒ Transducer a b m x
+  → Consumer (Maybe b) m y
+  → Consumer (Maybe a) m (x /\ y)
+transduceConsumer t c = toConsumer $ t >-> fromConsumer c
